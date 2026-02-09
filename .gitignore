@@ -1,0 +1,8 @@
+.env
+workdir
+node_modules
+.DS_Store
+dist
+*.local.json
+.claude
+/example
