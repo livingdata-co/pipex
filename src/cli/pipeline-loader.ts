@@ -1,23 +1,53 @@
 import {readFile} from 'node:fs/promises'
-import type {PipelineConfig, StepConfig} from './types.js'
+import {getKit} from '../kits/index.js'
+import {isKitStep, type CacheSpec, type KitStepDefinition, type MountSpec, type Pipeline, type PipelineDefinition, type Step, type StepDefinition} from '../types.js'
 
 export class PipelineLoader {
-  async load(filePath: string): Promise<PipelineConfig> {
+  async load(filePath: string): Promise<Pipeline> {
     const content = await readFile(filePath, 'utf8')
-    const config = JSON.parse(content) as PipelineConfig
+    const input = JSON.parse(content) as PipelineDefinition
 
-    if (!Array.isArray(config.steps) || config.steps.length === 0) {
+    if (!Array.isArray(input.steps) || input.steps.length === 0) {
       throw new Error('Invalid pipeline: steps must be a non-empty array')
     }
 
-    for (const step of config.steps) {
+    const steps = input.steps.map(step => this.resolveStep(step))
+
+    for (const step of steps) {
       this.validateStep(step)
     }
 
-    return config
+    return {name: input.name, steps}
   }
 
-  private validateStep(step: StepConfig): void {
+  private resolveStep(step: StepDefinition): Step {
+    if (!isKitStep(step)) {
+      return step
+    }
+
+    return this.resolveKitStep(step)
+  }
+
+  private resolveKitStep(step: KitStepDefinition): Step {
+    const kit = getKit(step.uses)
+    const kitOutput = kit.resolve(step.with ?? {})
+
+    return {
+      id: step.id,
+      image: kitOutput.image,
+      cmd: kitOutput.cmd,
+      env: mergeEnv(kitOutput.env, step.env),
+      inputs: step.inputs,
+      outputPath: step.outputPath,
+      caches: mergeCaches(kitOutput.caches, step.caches),
+      mounts: mergeMounts(kitOutput.mounts, step.mounts),
+      timeoutSec: step.timeoutSec,
+      allowFailure: step.allowFailure,
+      allowNetwork: step.allowNetwork ?? kitOutput.allowNetwork
+    }
+  }
+
+  private validateStep(step: Step): void {
     if (!step.id || typeof step.id !== 'string') {
       throw new Error('Invalid step: id is required')
     }
@@ -110,4 +140,46 @@ export class PipelineLoader {
       throw new Error(`Invalid ${context}: '${id}' cannot contain '..'`)
     }
   }
+}
+
+function mergeEnv(
+  kitEnv?: Record<string, string>,
+  userEnv?: Record<string, string>
+): Record<string, string> | undefined {
+  if (!kitEnv && !userEnv) {
+    return undefined
+  }
+
+  return {...kitEnv, ...userEnv}
+}
+
+function mergeCaches(
+  kitCaches?: CacheSpec[],
+  userCaches?: CacheSpec[]
+): CacheSpec[] | undefined {
+  if (!kitCaches && !userCaches) {
+    return undefined
+  }
+
+  const map = new Map<string, CacheSpec>()
+  for (const c of kitCaches ?? []) {
+    map.set(c.name, c)
+  }
+
+  for (const c of userCaches ?? []) {
+    map.set(c.name, c)
+  }
+
+  return [...map.values()]
+}
+
+function mergeMounts(
+  kitMounts?: MountSpec[],
+  userMounts?: MountSpec[]
+): MountSpec[] | undefined {
+  if (!kitMounts && !userMounts) {
+    return undefined
+  }
+
+  return [...(kitMounts ?? []), ...(userMounts ?? [])]
 }
