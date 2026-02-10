@@ -14,14 +14,14 @@ Runs containers with explicit volume mounts and manages artifacts through a stag
 Run directly without installing:
 
 ```bash
-npx @livingdata/pipex run pipeline.yaml --workspace my-build
+npx @livingdata/pipex run pipeline.yaml
 ```
 
 Or install globally:
 
 ```bash
 npm install -g @livingdata/pipex
-pipex run pipeline.yaml --workspace my-build
+pipex run pipeline.yaml
 ```
 
 ## Usage
@@ -29,9 +29,6 @@ pipex run pipeline.yaml --workspace my-build
 ```bash
 # Interactive mode (default)
 pipex run pipeline.yaml
-
-# With workspace name (enables caching)
-pipex run pipeline.yaml --workspace my-build
 
 # JSON mode (for CI/CD)
 pipex run pipeline.yaml --json
@@ -290,7 +287,7 @@ examples/geodata/
 Steps: `download` → `extract` → `list-files` / `build-csv`
 
 ```bash
-pipex run examples/geodata/pipeline.yaml --workspace geodata
+pipex run examples/geodata/pipeline.yaml
 ```
 
 ### Multi-Language
@@ -315,7 +312,7 @@ examples/multi-language/
 Steps: `node-analyze` → `node-transform` → `python-analyze` → `python-transform`
 
 ```bash
-pipex run examples/multi-language/pipeline.yaml --workspace multi-language
+pipex run examples/multi-language/pipeline.yaml
 ```
 
 ## Caching & Workspaces
@@ -374,7 +371,7 @@ cp .env.example .env
 Run the CLI without building (via tsx):
 
 ```bash
-npm run cli -- run pipeline.yaml --workspace my-build
+npm run cli -- run pipeline.yaml
 npm run cli -- list
 ```
 
