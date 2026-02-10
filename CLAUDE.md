@@ -36,6 +36,14 @@ Two-layer design:
 - **reporter.ts** — Two implementations: `ConsoleReporter` (structured JSON via Pino) and `InteractiveReporter` (colored spinners via ora/chalk).
 - **index.ts** — CLI entry point using Commander.js.
 
+### Kits Layer (`src/kits/`) — Reusable step templates
+- **index.ts** — Kit registry. A `Kit` has a `name` and a `resolve(params)` method that returns a `KitOutput` (image, cmd, env, caches, mounts, allowNetwork). Kits are selected via `uses` in pipeline definitions.
+- **builtin/shell.ts** — General-purpose shell command runner. Without `packages`: alpine, no network. With `packages`: debian + apt-get install + apt cache + network. Accepts `run`, `packages`, `image`, `src`.
+- **builtin/node.ts** — Node.js script runner with npm/pnpm/yarn install and cache.
+- **builtin/python.ts** — Python script runner with pip/uv install and cache.
+
+Kit resolution happens in `PipelineLoader.resolveKitStep()`: `uses` selects the kit, `with` passes parameters, and user-level `env`/`caches`/`mounts` merge with kit defaults (user values win).
+
 ### Execution Flow
 ```
 CLI → PipelineRunner.run() → PipelineLoader.load() → Workspace.create()

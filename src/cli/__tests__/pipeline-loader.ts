@@ -273,7 +273,7 @@ test('parse: resolves kit step (uses → image/cmd)', t => {
     id: 'p',
     steps: [{
       id: 'b',
-      uses: 'bash',
+      uses: 'shell',
       with: {run: 'echo hello'}
     }]
   }), 'p.json')

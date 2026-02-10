@@ -1,0 +1,39 @@
+name: Geodata Processing
+steps:
+  - id: download
+    name: Download Dresden Shapefiles
+    uses: shell
+    with:
+      packages: [curl, ca-certificates]
+      run: curl -fsSL https://www.geofabrik.de/data/shapefiles_dresden.zip -o /output/shapefiles_dresden.zip
+
+  - id: extract
+    name: Extract Archive
+    uses: shell
+    with:
+      packages: [unzip]
+      run: unzip /input/download/shapefiles_dresden.zip -d /output/
+    inputs: [{ step: download }]
+
+  - id: list-files
+    name: List Extracted Files
+    uses: shell
+    with:
+      run: ls -lhR /input/extract/
+    inputs: [{ step: extract }]
+
+  - id: build-csv
+    name: Build File Inventory CSV
+    uses: shell
+    with:
+      image: debian:bookworm-slim
+      run: |
+        echo "filename,size_bytes" > /output/inventory.csv
+        find /input/extract -type f | sort | while read -r f; do
+          size=$(stat -c%s "$f")
+          name=$(basename "$f")
+          echo "$name,$size" >> /output/inventory.csv
+        done
+        echo "--- inventory.csv ---"
+        cat /output/inventory.csv
+    inputs: [{ step: extract }]

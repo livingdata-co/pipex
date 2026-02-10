@@ -53,7 +53,7 @@ const rules = {
 }
 
 const ignoreExamples = {
-  ignores: ['example/**']
+  ignores: ['examples/**']
 }
 
 const testOverrides = {

@@ -126,6 +126,10 @@ steps:
   - id: analyze
     uses: python
     with: { script: analyze.py, src: scripts }
+  - id: extract
+    uses: shell
+    with: { packages: [unzip], run: "unzip /input/build/archive.zip -d /output/" }
+    inputs: [{ step: build }]
 ```
 
 `uses` and `image`/`cmd` are mutually exclusive. All other step fields (`env`, `inputs`, `mounts`, `caches`, `timeoutSec`, `allowFailure`, `allowNetwork`) remain available and merge with kit defaults (user values take priority). The `src` parameter in `with` generates a read-only mount at `/app` in the container.
@@ -154,13 +158,32 @@ steps:
 | `install` | `true` | Run dependency install before script |
 | `variant` | `"slim"` | Image variant |
 
-**`bash`** -- Run a shell command in a lightweight container.
+**`shell`** -- Run a shell command in a container, with optional apt package installation.
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `run` | *(required)* | Shell command to execute |
+| `packages` | -- | Apt packages to install before running |
 | `src` | -- | Host directory to mount at `/app` |
-| `image` | `"alpine:3.20"` | Docker image |
+| `image` | `"alpine:3.20"` | Docker image (defaults to `"debian:bookworm-slim"` when `packages` is set) |
+
+When `packages` is provided, the kit automatically switches to a Debian image, enables network access, and provides an `apt-cache` cache. Without packages, it runs on a minimal Alpine image with no network.
+
+```yaml
+# Simple command (alpine, no network)
+- id: list-files
+  uses: shell
+  with:
+    run: ls -lhR /input/data/
+
+# With system packages (debian, network + apt cache)
+- id: extract
+  uses: shell
+  with:
+    packages: [unzip, jq]
+    run: unzip /input/download/data.zip -d /output/
+  inputs: [{ step: download }]
+```
 
 ### Raw Steps
 
@@ -253,12 +276,29 @@ Common use cases:
 
 **Note**: Caches are workspace-scoped (not global). Different workspaces have isolated caches.
 
-## Example
+## Examples
 
-The `example/` directory contains a multi-language pipeline that chains Node.js and Python steps using kits:
+### Geodata Processing
+
+The `examples/geodata/` pipeline downloads a shapefile archive, extracts it, and produces a CSV inventory — using the `debian` and `bash` kits:
 
 ```
-example/
+examples/geodata/
+└── pipeline.yaml
+```
+
+Steps: `download` → `extract` → `list-files` / `build-csv`
+
+```bash
+pipex run examples/geodata/pipeline.yaml --workspace geodata
+```
+
+### Multi-Language
+
+The `examples/multi-language/` pipeline chains Node.js and Python steps using kits:
+
+```
+examples/multi-language/
 ├── pipeline.yaml
 └── scripts/
     ├── nodejs/              # lodash-based data analysis
@@ -272,10 +312,10 @@ example/
         └── transform.py
 ```
 
-The pipeline uses the `node` and `python` kits to run 4 steps: `node-analyze` → `node-transform` → `python-analyze` → `python-transform`. Each step passes artifacts to the next via `/input`.
+Steps: `node-analyze` → `node-transform` → `python-analyze` → `python-transform`
 
 ```bash
-pipex run example/pipeline.yaml --workspace example-test
+pipex run examples/multi-language/pipeline.yaml --workspace multi-language
 ```
 
 ## Caching & Workspaces

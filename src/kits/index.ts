@@ -1,7 +1,7 @@
 import type {Step} from '../types.js'
-import {bashKit} from './builtin/bash.js'
 import {nodeKit} from './builtin/node.js'
 import {pythonKit} from './builtin/python.js'
+import {shellKit} from './builtin/shell.js'
 
 export type KitOutput = Omit<Step, 'id' | 'name' | 'inputs' | 'outputPath' | 'timeoutSec' | 'allowFailure'>
 
@@ -11,9 +11,9 @@ export type Kit = {
 }
 
 const kits = new Map<string, Kit>([
-  [bashKit.name, bashKit],
   [nodeKit.name, nodeKit],
-  [pythonKit.name, pythonKit]
+  [pythonKit.name, pythonKit],
+  [shellKit.name, shellKit]
 ])
 
 export function getKit(name: string): Kit {
