@@ -39,6 +39,8 @@ export type CacheSpec = {
  */
 export type Step = {
   id: string;
+  /** Human-readable display name. Falls back to `id` when absent. */
+  name?: string;
   image: string;
   cmd: string[];
   env?: Record<string, string>;
@@ -56,6 +58,8 @@ export type Step = {
 
 /** A pipeline whose steps have all been resolved. */
 export type Pipeline = {
+  id: string;
+  /** Human-readable display name. Falls back to `id` when absent. */
   name?: string;
   steps: Step[];
 }
@@ -70,7 +74,9 @@ export type Pipeline = {
  * with user-specified values taking priority.
  */
 export type KitStepDefinition = {
-  id: string;
+  id?: string;
+  /** Human-readable display name. At least one of `id` or `name` must be provided. */
+  name?: string;
   /** Kit name (e.g. "node", "python", "bash"). */
   uses: string;
   /** Kit-specific parameters (e.g. { version: "24", script: "build.js" }). */
@@ -85,14 +91,18 @@ export type KitStepDefinition = {
   allowNetwork?: boolean;
 }
 
-/** A step definition with explicit image and cmd (same shape as a resolved Step). */
-export type RawStepDefinition = Step
+/**
+ * A step definition with explicit image and cmd.
+ * `id` is optional in definitions — derived from `name` via slugify if missing.
+ */
+export type RawStepDefinition = Omit<Step, 'id'> & {id?: string}
 
 /** A step as written in the pipeline definition — either fully specified or using a kit. */
 export type StepDefinition = RawStepDefinition | KitStepDefinition
 
 /** A pipeline definition as written in JSON, before kit resolution. */
 export type PipelineDefinition = {
+  id?: string;
   name?: string;
   steps: StepDefinition[];
 }

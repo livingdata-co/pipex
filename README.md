@@ -89,6 +89,36 @@ Pipeline files can be written in **YAML** (`.yaml` / `.yml`) or **JSON** (`.json
 
 Steps can be defined in two ways: **raw steps** with explicit image/cmd, or **kit steps** using `uses` for common patterns. Both can coexist in the same pipeline.
 
+### Pipeline and Step Identity
+
+Both pipelines and steps support an `id`/`name` duality:
+
+- **`id`** — Machine identifier (alphanum, dash, underscore). Used for caching, state, artifacts.
+- **`name`** — Human-readable label (free-form text). Used for display.
+- At least one must be defined. If `id` is missing it is derived from `name` via slugification (e.g. `"Données préparées"` → `donnees-preparees`). If `name` is missing, `id` is used for display.
+
+```yaml
+# Pipeline with both id and name
+id: data-pipeline
+name: Data Processing Pipeline
+steps:
+  # Step with only id (current style, still works)
+  - id: download
+    image: alpine:3.19
+    cmd: [sh, -c, "echo hello > /output/hello.txt"]
+
+  # Step with only name (id auto-derived to "build-assets")
+  - name: Build Assets
+    image: node:22-alpine
+    cmd: [sh, -c, "echo done > /output/result.txt"]
+
+  # Step with both
+  - id: deploy
+    name: Deploy to Staging
+    image: alpine:3.19
+    cmd: [echo, deployed]
+```
+
 ### Kit Steps
 
 Kits are reusable templates that generate the image, command, caches, and mounts for common runtimes. Use `uses` to select a kit and `with` to pass parameters:
@@ -158,7 +188,8 @@ steps:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `id` | string | Step identifier (required) |
+| `id` | string | Step identifier (at least one of `id`/`name` required) |
+| `name` | string | Human-readable display name |
 | `image` | string | Docker image (required for raw steps) |
 | `cmd` | string[] | Command to execute (required for raw steps) |
 | `uses` | string | Kit name (required for kit steps) |
@@ -255,11 +286,9 @@ npm start -- run example/pipeline.yaml --workspace example-test
 
 ## Caching & Workspaces
 
-Workspaces enable caching across runs. Name is determined by:
+Workspaces enable caching across runs. The workspace ID is determined by:
 1. CLI flag `--workspace` (highest priority)
-2. Config `"name"` field
-3. Filename (e.g., `build.yaml` → `build`)
-4. Auto-generated timestamp
+2. Pipeline `id` (explicit or derived from `name`)
 
 **Cache behavior**: Steps are skipped if image, cmd, env, inputs, and mounts haven't changed. See code documentation for details.
 

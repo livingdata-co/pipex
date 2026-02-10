@@ -1,7 +1,7 @@
 import {cp} from 'node:fs/promises'
-import {basename, dirname, resolve} from 'node:path'
+import {dirname, resolve} from 'node:path'
 import {Workspace, type ContainerExecutor, type InputMount, type OutputMount, type CacheMount, type BindMount} from '../engine/index.js'
-import type {Reporter} from './reporter.js'
+import type {Reporter, StepRef} from './reporter.js'
 import type {PipelineLoader} from './pipeline-loader.js'
 import {StateManager} from './state.js'
 
@@ -48,10 +48,8 @@ export class PipelineRunner {
     const config = await this.loader.load(pipelineFilePath)
     const pipelineRoot = dirname(resolve(pipelineFilePath))
 
-    // Workspace ID priority: CLI arg > config.name > filename
-    const workspaceId = workspaceName
-      ?? config.name
-      ?? basename(pipelineFilePath).replace(/\.[^.]+$/, '').replaceAll(/[^\w-]/g, '-')
+    // Workspace ID priority: CLI arg > pipeline id
+    const workspaceId = workspaceName ?? config.id
 
     let workspace: Workspace
     try {
@@ -67,9 +65,10 @@ export class PipelineRunner {
     await state.load()
     const stepArtifacts = new Map<string, string>()
 
-    this.reporter.state(workspace.id, 'PIPELINE_START')
+    this.reporter.state(workspace.id, 'PIPELINE_START', undefined, {pipelineName: config.name ?? config.id})
 
     for (const step of config.steps) {
+      const stepRef: StepRef = {id: step.id, displayName: step.name ?? step.id}
       const inputArtifactIds = step.inputs
         ?.map(i => stepArtifacts.get(i.step))
         .filter((id): id is string => id !== undefined)
@@ -86,11 +85,11 @@ export class PipelineRunner {
       })
 
       const skipCache = force === true || (Array.isArray(force) && force.includes(step.id))
-      if (!skipCache && await this.tryUseCache({workspace, state, step, currentFingerprint, stepArtifacts})) {
+      if (!skipCache && await this.tryUseCache({workspace, state, step, stepRef, currentFingerprint, stepArtifacts})) {
         continue
       }
 
-      this.reporter.state(workspace.id, 'STEP_STARTING', step.id)
+      this.reporter.state(workspace.id, 'STEP_STARTING', stepRef)
 
       const artifactId = workspace.generateArtifactId()
       const stagingPath = await workspace.prepareArtifact(artifactId)
@@ -121,11 +120,11 @@ export class PipelineRunner {
           timeoutSec: step.timeoutSec
         },
         ({stream, line}) => {
-          this.reporter.log(workspace.id, step.id, stream, line)
+          this.reporter.log(workspace.id, stepRef, stream, line)
         }
       )
 
-      this.reporter.result(workspace.id, step.id, result)
+      this.reporter.result(workspace.id, stepRef, result)
 
       if (result.exitCode === 0 || step.allowFailure) {
         await workspace.commitArtifact(artifactId)
@@ -134,10 +133,10 @@ export class PipelineRunner {
         state.setStep(step.id, artifactId, currentFingerprint)
         await state.save()
 
-        this.reporter.state(workspace.id, 'STEP_FINISHED', step.id, {artifactId})
+        this.reporter.state(workspace.id, 'STEP_FINISHED', stepRef, {artifactId})
       } else {
         await workspace.discardArtifact(artifactId)
-        this.reporter.state(workspace.id, 'STEP_FAILED', step.id, {exitCode: result.exitCode})
+        this.reporter.state(workspace.id, 'STEP_FAILED', stepRef, {exitCode: result.exitCode})
         this.reporter.state(workspace.id, 'PIPELINE_FAILED')
         throw new Error(`Step ${step.id} failed with exit code ${result.exitCode}`)
       }
@@ -150,12 +149,14 @@ export class PipelineRunner {
     workspace,
     state,
     step,
+    stepRef,
     currentFingerprint,
     stepArtifacts
   }: {
     workspace: Workspace;
     state: StateManager;
-    step: {id: string};
+    step: {id: string; name?: string};
+    stepRef: StepRef;
     currentFingerprint: string;
     stepArtifacts: Map<string, string>;
   }): Promise<boolean> {
@@ -165,7 +166,7 @@ export class PipelineRunner {
         const artifacts = await workspace.listArtifacts()
         if (artifacts.includes(cached.artifactId)) {
           stepArtifacts.set(step.id, cached.artifactId)
-          this.reporter.state(workspace.id, 'STEP_SKIPPED', step.id, {artifactId: cached.artifactId, reason: 'cached'})
+          this.reporter.state(workspace.id, 'STEP_SKIPPED', stepRef, {artifactId: cached.artifactId, reason: 'cached'})
           return true
         }
       } catch {

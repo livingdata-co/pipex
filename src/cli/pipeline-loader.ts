@@ -1,5 +1,6 @@
 import {readFile} from 'node:fs/promises'
 import {extname} from 'node:path'
+import {deburr} from 'lodash-es'
 import {parse as parseYaml} from 'yaml'
 import {getKit} from '../kits/index.js'
 import {isKitStep, type CacheSpec, type KitStepDefinition, type MountSpec, type Pipeline, type PipelineDefinition, type Step, type StepDefinition} from '../types.js'
@@ -8,6 +9,12 @@ export class PipelineLoader {
   async load(filePath: string): Promise<Pipeline> {
     const content = await readFile(filePath, 'utf8')
     const input = parsePipelineFile(content, filePath) as PipelineDefinition
+
+    if (!input.id && !input.name) {
+      throw new Error('Invalid pipeline: at least one of "id" or "name" must be defined')
+    }
+
+    const pipelineId = input.id ?? slugify(input.name!)
 
     if (!Array.isArray(input.steps) || input.steps.length === 0) {
       throw new Error('Invalid pipeline: steps must be a non-empty array')
@@ -19,23 +26,33 @@ export class PipelineLoader {
       this.validateStep(step)
     }
 
-    return {name: input.name, steps}
+    this.validateUniqueStepIds(steps)
+
+    return {id: pipelineId, name: input.name, steps}
   }
 
   private resolveStep(step: StepDefinition): Step {
-    if (!isKitStep(step)) {
-      return step
+    if (!step.id && !step.name) {
+      throw new Error('Invalid step: at least one of "id" or "name" must be defined')
     }
 
-    return this.resolveKitStep(step)
+    const id = step.id ?? slugify(step.name!)
+    const {name} = step
+
+    if (!isKitStep(step)) {
+      return {...step, id, name}
+    }
+
+    return this.resolveKitStep(step, id, name)
   }
 
-  private resolveKitStep(step: KitStepDefinition): Step {
+  private resolveKitStep(step: KitStepDefinition, id: string, name: string | undefined): Step {
     const kit = getKit(step.uses)
     const kitOutput = kit.resolve(step.with ?? {})
 
     return {
-      id: step.id,
+      id,
+      name,
       image: kitOutput.image,
       cmd: kitOutput.cmd,
       env: mergeEnv(kitOutput.env, step.env),
@@ -50,10 +67,6 @@ export class PipelineLoader {
   }
 
   private validateStep(step: Step): void {
-    if (!step.id || typeof step.id !== 'string') {
-      throw new Error('Invalid step: id is required')
-    }
-
     this.validateIdentifier(step.id, 'step id')
 
     if (!step.image || typeof step.image !== 'string') {
@@ -142,6 +155,27 @@ export class PipelineLoader {
       throw new Error(`Invalid ${context}: '${id}' cannot contain '..'`)
     }
   }
+
+  private validateUniqueStepIds(steps: Step[]): void {
+    const seen = new Set<string>()
+    for (const step of steps) {
+      if (seen.has(step.id)) {
+        throw new Error(`Duplicate step id: '${step.id}'`)
+      }
+
+      seen.add(step.id)
+    }
+  }
+}
+
+/** Convert a free-form name into a valid identifier. */
+function slugify(name: string): string {
+  return deburr(name)
+    .toLowerCase()
+    .replaceAll(/[^\w-]/g, '-')
+    .replaceAll(/-{2,}/g, '-')
+    .replace(/^-/, '')
+    .replace(/-$/, '')
 }
 
 function parsePipelineFile(content: string, filePath: string): unknown {

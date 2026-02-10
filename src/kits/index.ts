@@ -3,7 +3,7 @@ import {bashKit} from './builtin/bash.js'
 import {nodeKit} from './builtin/node.js'
 import {pythonKit} from './builtin/python.js'
 
-export type KitOutput = Omit<Step, 'id' | 'inputs' | 'outputPath' | 'timeoutSec' | 'allowFailure'>
+export type KitOutput = Omit<Step, 'id' | 'name' | 'inputs' | 'outputPath' | 'timeoutSec' | 'allowFailure'>
 
 export type Kit = {
   name: string;
