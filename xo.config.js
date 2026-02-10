@@ -56,10 +56,23 @@ const ignoreExamples = {
   ignores: ['example/**']
 }
 
+const testOverrides = {
+  files: ['**/__tests__/**'],
+  rules: {
+    '@typescript-eslint/no-unsafe-call': 'off',
+    '@typescript-eslint/no-unsafe-assignment': 'off',
+    '@typescript-eslint/no-unsafe-return': 'off',
+    '@typescript-eslint/no-unsafe-argument': 'off',
+    'ava/no-ignored-test-files': 'off',
+    'ava/no-import-test-files': 'off'
+  }
+}
+
 const config = [
   ignoreExamples,
   jsFilesConfig,
-  rules
+  rules,
+  testOverrides
 ]
 
 export default config

@@ -15,11 +15,10 @@ pipex rm <workspace>                                   # Remove workspace
 pipex clean                                            # Remove all workspaces
 npm run cli -- run <pipeline.yaml> --workspace <name>  # Run pipeline (dev mode via tsx)
 npm run build                                          # Compile TypeScript (tsc → dist/)
+npm test                                               # Run unit tests with AVA
 npm run lint                                           # Lint with XO
 npm run lint:fix                                       # Auto-fix lint issues
 ```
-
-No test framework is currently configured.
 
 ## Architecture
 

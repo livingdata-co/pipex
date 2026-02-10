@@ -8,6 +8,10 @@ import {isKitStep, type CacheSpec, type KitStepDefinition, type MountSpec, type 
 export class PipelineLoader {
   async load(filePath: string): Promise<Pipeline> {
     const content = await readFile(filePath, 'utf8')
+    return this.parse(content, filePath)
+  }
+
+  parse(content: string, filePath: string): Pipeline {
     const input = parsePipelineFile(content, filePath) as PipelineDefinition
 
     if (!input.id && !input.name) {
@@ -169,7 +173,7 @@ export class PipelineLoader {
 }
 
 /** Convert a free-form name into a valid identifier. */
-function slugify(name: string): string {
+export function slugify(name: string): string {
   return deburr(name)
     .toLowerCase()
     .replaceAll(/[^\w-]/g, '-')
@@ -178,7 +182,7 @@ function slugify(name: string): string {
     .replace(/-$/, '')
 }
 
-function parsePipelineFile(content: string, filePath: string): unknown {
+export function parsePipelineFile(content: string, filePath: string): unknown {
   const ext = extname(filePath).toLowerCase()
   if (ext === '.yaml' || ext === '.yml') {
     return parseYaml(content)
@@ -187,7 +191,7 @@ function parsePipelineFile(content: string, filePath: string): unknown {
   return JSON.parse(content)
 }
 
-function mergeEnv(
+export function mergeEnv(
   kitEnv?: Record<string, string>,
   userEnv?: Record<string, string>
 ): Record<string, string> | undefined {
@@ -198,7 +202,7 @@ function mergeEnv(
   return {...kitEnv, ...userEnv}
 }
 
-function mergeCaches(
+export function mergeCaches(
   kitCaches?: CacheSpec[],
   userCaches?: CacheSpec[]
 ): CacheSpec[] | undefined {
@@ -218,7 +222,7 @@ function mergeCaches(
   return [...map.values()]
 }
 
-function mergeMounts(
+export function mergeMounts(
   kitMounts?: MountSpec[],
   userMounts?: MountSpec[]
 ): MountSpec[] | undefined {
