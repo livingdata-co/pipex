@@ -85,7 +85,67 @@ npx . list
 
 ## Pipeline Format
 
-Minimal example:
+Steps can be defined in two ways: **raw steps** with explicit image/cmd, or **kit steps** using `uses` for common patterns. Both can coexist in the same pipeline.
+
+### Kit Steps
+
+Kits are reusable templates that generate the image, command, caches, and mounts for common runtimes. Use `uses` to select a kit and `with` to pass parameters:
+
+```json
+{
+  "name": "my-pipeline",
+  "steps": [
+    {
+      "id": "build",
+      "uses": "node",
+      "with": {"script": "build.js", "src": "src/app"}
+    },
+    {
+      "id": "analyze",
+      "uses": "python",
+      "with": {"script": "analyze.py", "src": "scripts"}
+    }
+  ]
+}
+```
+
+`uses` and `image`/`cmd` are mutually exclusive. All other step fields (`env`, `inputs`, `mounts`, `caches`, `timeoutSec`, `allowFailure`, `allowNetwork`) remain available and merge with kit defaults (user values take priority). The `src` parameter in `with` generates a read-only mount at `/app` in the container.
+
+#### Available Kits
+
+**`node`** -- Run a Node.js script with automatic dependency installation.
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `script` | *(required)* | Script to run (relative to `/app`) |
+| `src` | -- | Host directory to mount at `/app` |
+| `version` | `"24"` | Node.js version |
+| `packageManager` | `"npm"` | `"npm"`, `"pnpm"`, or `"yarn"` |
+| `install` | `true` | Run package install before script |
+| `variant` | `"alpine"` | Image variant |
+
+**`python`** -- Run a Python script with automatic dependency installation from `requirements.txt`.
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `script` | *(required)* | Script to run (relative to `/app`) |
+| `src` | -- | Host directory to mount at `/app` |
+| `version` | `"3.12"` | Python version |
+| `packageManager` | `"pip"` | `"pip"` or `"uv"` |
+| `install` | `true` | Run dependency install before script |
+| `variant` | `"slim"` | Image variant |
+
+**`bash`** -- Run a shell command in a lightweight container.
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `run` | *(required)* | Shell command to execute |
+| `src` | -- | Host directory to mount at `/app` |
+| `image` | `"alpine:3.20"` | Docker image |
+
+### Raw Steps
+
+For full control, define `image` and `cmd` directly:
 
 ```json
 {
@@ -111,8 +171,10 @@ Minimal example:
 | Field | Type | Description |
 |-------|------|-------------|
 | `id` | string | Step identifier (required) |
-| `image` | string | Docker image (required) |
-| `cmd` | string[] | Command to execute (required) |
+| `image` | string | Docker image (required for raw steps) |
+| `cmd` | string[] | Command to execute (required for raw steps) |
+| `uses` | string | Kit name (required for kit steps) |
+| `with` | object | Kit parameters |
 | `inputs` | InputSpec[] | Previous steps to mount as read-only |
 | `env` | Record<string, string> | Environment variables |
 | `outputPath` | string | Output mount point (default: `/output`) |
@@ -178,23 +240,24 @@ Common use cases:
 
 ## Example
 
-The `example/` directory contains a multi-language pipeline that chains Node.js and Python steps:
+The `example/` directory contains a multi-language pipeline that chains Node.js and Python steps using kits:
 
 ```
 example/
 ├── pipeline.json
 └── scripts/
-    ├── nodejs/          # lodash-based data analysis
+    ├── nodejs/              # lodash-based data analysis
     │   ├── package.json
     │   ├── analyze.js
     │   └── transform.js
-    └── python/          # pyyaml-based enrichment
+    └── python/              # pyyaml-based enrichment
         ├── pyproject.toml
+        ├── requirements.txt
         ├── analyze.py
         └── transform.py
 ```
 
-The pipeline runs 4 steps: `node-analyze` → `node-transform` → `python-analyze` → `python-transform`. Each step mounts its scripts directory as read-only and passes artifacts to the next step via `/input`.
+The pipeline uses the `node` and `python` kits to run 4 steps: `node-analyze` → `node-transform` → `python-analyze` → `python-transform`. Each step passes artifacts to the next via `/input`.
 
 ```bash
 npm start -- run example/pipeline.json --workspace example-test
@@ -259,3 +322,4 @@ npm run lint:fix
 For implementation details, see code documentation in:
 - `src/engine/` - Low-level container execution (workspace, executor)
 - `src/cli/` - Pipeline orchestration (runner, loader, state)
+- `src/kits/` - Kit system (registry, built-in kit implementations)
