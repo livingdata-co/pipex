@@ -32,7 +32,7 @@ async function main() {
   program
     .command('run')
     .description('Execute a pipeline')
-    .argument('<pipeline>', 'Pipeline JSON file to execute')
+    .argument('<pipeline>', 'Pipeline file to execute (JSON or YAML)')
     .option('-w, --workspace <name>', 'Workspace name (for caching)')
     .option('-f, --force [steps]', 'Skip cache for all steps, or a comma-separated list (e.g. --force step1,step2)')
     .action(async (pipelineFile: string, options: {workspace?: string; force?: string | boolean}, cmd: Command) => {

@@ -51,7 +51,7 @@ export class PipelineRunner {
     // Workspace ID priority: CLI arg > config.name > filename
     const workspaceId = workspaceName
       ?? config.name
-      ?? basename(pipelineFilePath, '.json').replaceAll(/[^\w-]/g, '-')
+      ?? basename(pipelineFilePath).replace(/\.[^.]+$/, '').replaceAll(/[^\w-]/g, '-')
 
     let workspace: Workspace
     try {

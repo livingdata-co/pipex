@@ -1,11 +1,13 @@
 import {readFile} from 'node:fs/promises'
+import {extname} from 'node:path'
+import {parse as parseYaml} from 'yaml'
 import {getKit} from '../kits/index.js'
 import {isKitStep, type CacheSpec, type KitStepDefinition, type MountSpec, type Pipeline, type PipelineDefinition, type Step, type StepDefinition} from '../types.js'
 
 export class PipelineLoader {
   async load(filePath: string): Promise<Pipeline> {
     const content = await readFile(filePath, 'utf8')
-    const input = JSON.parse(content) as PipelineDefinition
+    const input = parsePipelineFile(content, filePath) as PipelineDefinition
 
     if (!Array.isArray(input.steps) || input.steps.length === 0) {
       throw new Error('Invalid pipeline: steps must be a non-empty array')
@@ -140,6 +142,15 @@ export class PipelineLoader {
       throw new Error(`Invalid ${context}: '${id}' cannot contain '..'`)
     }
   }
+}
+
+function parsePipelineFile(content: string, filePath: string): unknown {
+  const ext = extname(filePath).toLowerCase()
+  if (ext === '.yaml' || ext === '.yml') {
+    return parseYaml(content)
+  }
+
+  return JSON.parse(content)
 }
 
 function mergeEnv(

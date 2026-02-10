@@ -23,16 +23,16 @@ cp .env.example .env
 
 ```bash
 # Interactive mode (default)
-npm start -- run pipeline.example.json
+npm start -- run pipeline.example.yaml
 
 # With workspace name (enables caching)
-npm start -- run pipeline.example.json --workspace my-build
+npm start -- run pipeline.example.yaml --workspace my-build
 
 # JSON mode (for CI/CD)
-npm start -- run pipeline.example.json --json
+npm start -- run pipeline.example.yaml --json
 
 # Custom workdir
-npm start -- run pipeline.example.json --workdir /tmp/builds
+npm start -- run pipeline.example.yaml --workdir /tmp/builds
 ```
 
 ### Managing workspaces
@@ -56,7 +56,7 @@ npm start -- clean
 npm run build
 
 # Run locally via npx
-npx . run example/pipeline.json --workspace my-build
+npx . run example/pipeline.yaml --workspace my-build
 npx . list
 ```
 
@@ -85,28 +85,23 @@ npx . list
 
 ## Pipeline Format
 
+Pipeline files can be written in **YAML** (`.yaml` / `.yml`) or **JSON** (`.json`). YAML is recommended for readability; JSON is still fully supported.
+
 Steps can be defined in two ways: **raw steps** with explicit image/cmd, or **kit steps** using `uses` for common patterns. Both can coexist in the same pipeline.
 
 ### Kit Steps
 
 Kits are reusable templates that generate the image, command, caches, and mounts for common runtimes. Use `uses` to select a kit and `with` to pass parameters:
 
-```json
-{
-  "name": "my-pipeline",
-  "steps": [
-    {
-      "id": "build",
-      "uses": "node",
-      "with": {"script": "build.js", "src": "src/app"}
-    },
-    {
-      "id": "analyze",
-      "uses": "python",
-      "with": {"script": "analyze.py", "src": "scripts"}
-    }
-  ]
-}
+```yaml
+name: my-pipeline
+steps:
+  - id: build
+    uses: node
+    with: { script: build.js, src: src/app }
+  - id: analyze
+    uses: python
+    with: { script: analyze.py, src: scripts }
 ```
 
 `uses` and `image`/`cmd` are mutually exclusive. All other step fields (`env`, `inputs`, `mounts`, `caches`, `timeoutSec`, `allowFailure`, `allowNetwork`) remain available and merge with kit defaults (user values take priority). The `src` parameter in `with` generates a read-only mount at `/app` in the container.
@@ -147,23 +142,16 @@ Kits are reusable templates that generate the image, command, caches, and mounts
 
 For full control, define `image` and `cmd` directly:
 
-```json
-{
-  "name": "my-pipeline",
-  "steps": [
-    {
-      "id": "download",
-      "image": "alpine:3.19",
-      "cmd": ["sh", "-c", "echo hello > /output/hello.txt"]
-    },
-    {
-      "id": "process",
-      "image": "alpine:3.19",
-      "cmd": ["cat", "/input/download/hello.txt"],
-      "inputs": [{"step": "download"}]
-    }
-  ]
-}
+```yaml
+name: my-pipeline
+steps:
+  - id: download
+    image: alpine:3.19
+    cmd: [sh, -c, "echo hello > /output/hello.txt"]
+  - id: process
+    image: alpine:3.19
+    cmd: [cat, /input/download/hello.txt]
+    inputs: [{ step: download }]
 ```
 
 ### Step Options
@@ -188,11 +176,11 @@ For full control, define `image` and `cmd` directly:
 
 Mount previous steps as read-only:
 
-```json
-"inputs": [
-  {"step": "step1"},
-  {"step": "step2", "copyToOutput": true}
-]
+```yaml
+inputs:
+  - step: step1
+  - step: step2
+    copyToOutput: true
 ```
 
 - Mounted under `/input/{stepName}/`
@@ -202,11 +190,12 @@ Mount previous steps as read-only:
 
 Mount host directories into containers as **read-only**:
 
-```json
-"mounts": [
-  {"host": "src/app", "container": "/app"},
-  {"host": "config", "container": "/config"}
-]
+```yaml
+mounts:
+  - host: src/app
+    container: /app
+  - host: config
+    container: /config
 ```
 
 - `host` must be a **relative** path (resolved from the pipeline file's directory)
@@ -214,17 +203,18 @@ Mount host directories into containers as **read-only**:
 - Neither path can contain `..`
 - Always mounted read-only -- containers cannot modify host files
 
-This means a pipeline at `/project/ci/pipeline.json` can only mount subdirectories of `/project/ci/`. Use `/tmp` or `/output` inside the container for writes.
+This means a pipeline at `/project/ci/pipeline.yaml` can only mount subdirectories of `/project/ci/`. Use `/tmp` or `/output` inside the container for writes.
 
 ### Caches
 
 Persistent read-write directories shared across steps and executions:
 
-```json
-"caches": [
-  {"name": "pnpm-store", "path": "/root/.local/share/pnpm/store"},
-  {"name": "build-cache", "path": "/tmp/cache"}
-]
+```yaml
+caches:
+  - name: pnpm-store
+    path: /root/.local/share/pnpm/store
+  - name: build-cache
+    path: /tmp/cache
 ```
 
 - **Persistent**: Caches survive across pipeline executions
@@ -244,7 +234,7 @@ The `example/` directory contains a multi-language pipeline that chains Node.js 
 
 ```
 example/
-├── pipeline.json
+├── pipeline.yaml
 └── scripts/
     ├── nodejs/              # lodash-based data analysis
     │   ├── package.json
@@ -260,7 +250,7 @@ example/
 The pipeline uses the `node` and `python` kits to run 4 steps: `node-analyze` → `node-transform` → `python-analyze` → `python-transform`. Each step passes artifacts to the next via `/input`.
 
 ```bash
-npm start -- run example/pipeline.json --workspace example-test
+npm start -- run example/pipeline.yaml --workspace example-test
 ```
 
 ## Caching & Workspaces
@@ -268,7 +258,7 @@ npm start -- run example/pipeline.json --workspace example-test
 Workspaces enable caching across runs. Name is determined by:
 1. CLI flag `--workspace` (highest priority)
 2. Config `"name"` field
-3. Filename (e.g., `build.json` → `build`)
+3. Filename (e.g., `build.yaml` → `build`)
 4. Auto-generated timestamp
 
 **Cache behavior**: Steps are skipped if image, cmd, env, inputs, and mounts haven't changed. See code documentation for details.
