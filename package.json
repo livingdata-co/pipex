@@ -20,7 +20,7 @@
     "access": "public"
   },
   "scripts": {
-    "start": "tsx src/cli/index.ts",
+    "cli": "tsx src/cli/index.ts",
     "lint": "xo",
     "lint:fix": "xo --fix",
     "build": "tsc"

@@ -4,60 +4,54 @@ Execution engine for containerized steps via Docker CLI.
 
 Runs containers with explicit volume mounts and manages artifacts through a staging/commit lifecycle. Designed to be driven by different orchestrators (CLI included, AI agent planned).
 
-## Installation
-
-```bash
-npm install
-cp .env.example .env
-# Edit .env to set PIPEX_WORKDIR if needed (defaults to ./workdir)
-```
-
 ## Prerequisites
 
 - Node.js 24+
 - Docker CLI installed and accessible
 
-## Usage
+## Quick Start
 
-### Running a pipeline
+Run directly without installing:
+
+```bash
+npx @livingdata/pipex run pipeline.yaml --workspace my-build
+```
+
+Or install globally:
+
+```bash
+npm install -g @livingdata/pipex
+pipex run pipeline.yaml --workspace my-build
+```
+
+## Usage
 
 ```bash
 # Interactive mode (default)
-npm start -- run pipeline.example.yaml
+pipex run pipeline.yaml
 
 # With workspace name (enables caching)
-npm start -- run pipeline.example.yaml --workspace my-build
+pipex run pipeline.yaml --workspace my-build
 
 # JSON mode (for CI/CD)
-npm start -- run pipeline.example.yaml --json
+pipex run pipeline.yaml --json
 
 # Custom workdir
-npm start -- run pipeline.example.yaml --workdir /tmp/builds
+pipex run pipeline.yaml --workdir /tmp/builds
 ```
 
 ### Managing workspaces
 
 ```bash
 # List workspaces (with artifact/cache counts)
-npm start -- list
-npm start -- ls --json
+pipex list
+pipex ls --json
 
 # Remove specific workspaces
-npm start -- rm my-build other-build
+pipex rm my-build other-build
 
 # Remove all workspaces
-npm start -- clean
-```
-
-### Via npx
-
-```bash
-# Build first
-npm run build
-
-# Run locally via npx
-npx . run example/pipeline.yaml --workspace my-build
-npx . list
+pipex clean
 ```
 
 ### Commands
@@ -281,7 +275,7 @@ example/
 The pipeline uses the `node` and `python` kits to run 4 steps: `node-analyze` → `node-transform` → `python-analyze` → `python-transform`. Each step passes artifacts to the next via `/input`.
 
 ```bash
-npm start -- run example/pipeline.yaml --workspace example-test
+pipex run example/pipeline.yaml --workspace example-test
 ```
 
 ## Caching & Workspaces
@@ -314,10 +308,10 @@ newgrp docker
 Clean old workspaces:
 
 ```bash
-npm start -- list
-npm start -- rm old-workspace-id
+pipex list
+pipex rm old-workspace-id
 # Or remove all at once
-npm start -- clean
+pipex clean
 ```
 
 ### Cached step with missing artifact
@@ -331,9 +325,25 @@ rm $PIPEX_WORKDIR/{workspace-id}/state.json
 ## Development
 
 ```bash
-npm run build
-npm run lint
-npm run lint:fix
+git clone https://github.com/livingdata-co/pipex.git
+cd pipex
+npm install
+cp .env.example .env
+```
+
+Run the CLI without building (via tsx):
+
+```bash
+npm run cli -- run pipeline.yaml --workspace my-build
+npm run cli -- list
+```
+
+Other commands:
+
+```bash
+npm run build        # Compile TypeScript (tsc → dist/)
+npm run lint         # Lint with XO
+npm run lint:fix     # Auto-fix lint issues
 ```
 
 ## Architecture
