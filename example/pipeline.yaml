@@ -1,0 +1,24 @@
+name: Multi-Language Example
+steps:
+  - id: node-analyze
+    name: Node.js Analysis
+    uses: node
+    with: { version: "22", script: analyze.js, src: scripts/nodejs }
+
+  - id: node-transform
+    name: Node.js Transform
+    uses: node
+    with: { version: "22", script: transform.js, src: scripts/nodejs }
+    inputs: [{ step: node-analyze }]
+
+  - id: python-analyze
+    name: Python Analysis
+    uses: python
+    with: { version: "3.12", variant: alpine, script: analyze.py, src: scripts/python }
+    inputs: [{ step: node-transform }]
+
+  - id: python-transform
+    name: Python Transform
+    uses: python
+    with: { version: "3.12", variant: alpine, script: transform.py, src: scripts/python }
+    inputs: [{ step: python-analyze }]
