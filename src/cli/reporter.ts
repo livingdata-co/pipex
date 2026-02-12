@@ -69,8 +69,10 @@ export class ConsoleReporter implements Reporter {
  * Suitable for local development and manual execution.
  */
 export class InteractiveReporter implements Reporter {
+  private static readonly maxStderrLines = 20
   private readonly spinner?: Ora
   private readonly stepSpinners = new Map<string, Ora>()
+  private readonly stderrBuffers = new Map<string, string[]>()
 
   state(workspaceId: string, event: PipelineEvent, step?: StepRef, meta?: Record<string, unknown>): void {
     if (event === 'PIPELINE_START') {
@@ -99,6 +101,8 @@ export class InteractiveReporter implements Reporter {
         spinner.stopAndPersist({symbol: chalk.green('✓'), text: chalk.green(step.displayName)})
         this.stepSpinners.delete(step.id)
       }
+
+      this.stderrBuffers.delete(step.id)
     }
 
     if (event === 'STEP_FAILED' && step) {
@@ -112,6 +116,16 @@ export class InteractiveReporter implements Reporter {
         })
         this.stepSpinners.delete(step.id)
       }
+
+      const stderr = this.stderrBuffers.get(step.id)
+      if (stderr && stderr.length > 0) {
+        console.log(chalk.red('  ── stderr ──'))
+        for (const line of stderr) {
+          console.log(chalk.red(`  ${line}`))
+        }
+      }
+
+      this.stderrBuffers.delete(step.id)
     }
 
     if (event === 'PIPELINE_FINISHED') {
@@ -123,8 +137,19 @@ export class InteractiveReporter implements Reporter {
     }
   }
 
-  log(_workspaceId: string, _step: StepRef, _stream: 'stdout' | 'stderr', _line: string): void {
-    // Suppress logs in interactive mode
+  log(_workspaceId: string, step: StepRef, stream: 'stdout' | 'stderr', line: string): void {
+    if (stream === 'stderr') {
+      let buffer = this.stderrBuffers.get(step.id)
+      if (!buffer) {
+        buffer = []
+        this.stderrBuffers.set(step.id, buffer)
+      }
+
+      buffer.push(line)
+      if (buffer.length > InteractiveReporter.maxStderrLines) {
+        buffer.shift()
+      }
+    }
   }
 
   result(_workspaceId: string, _step: StepRef, _result: RunContainerResult): void {
