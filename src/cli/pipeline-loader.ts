@@ -64,10 +64,10 @@ export class PipelineLoader {
       outputPath: step.outputPath,
       caches: mergeCaches(kitOutput.caches, step.caches),
       mounts: mergeMounts(kitOutput.mounts, step.mounts),
+      sources: mergeMounts(kitOutput.sources, step.sources),
       timeoutSec: step.timeoutSec,
       allowFailure: step.allowFailure,
-      allowNetwork: step.allowNetwork ?? kitOutput.allowNetwork,
-      shadowPaths: kitOutput.shadowPaths
+      allowNetwork: step.allowNetwork ?? kitOutput.allowNetwork
     }
   }
 
@@ -90,6 +90,10 @@ export class PipelineLoader {
 
     if (step.mounts) {
       this.validateMounts(step.id, step.mounts)
+    }
+
+    if (step.sources) {
+      this.validateMounts(step.id, step.sources)
     }
 
     if (step.caches) {

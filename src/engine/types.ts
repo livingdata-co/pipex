@@ -72,12 +72,12 @@ export type RunContainerRequest = {
   caches?: CacheMount[];
   /** Host bind mounts (always read-only) */
   mounts?: BindMount[];
+  /** Host directories copied into the container's writable layer (not bind-mounted) */
+  sources?: BindMount[];
   /** Network isolation mode */
   network: 'none' | 'bridge';
   /** Execution timeout in seconds (undefined = no timeout) */
   timeoutSec?: number;
-  /** Paths to shadow with anonymous writable volumes */
-  shadowPaths?: string[];
 }
 
 /**

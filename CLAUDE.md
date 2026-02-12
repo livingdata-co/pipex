@@ -26,7 +26,7 @@ Two-layer design:
 
 ### Engine Layer (`src/engine/`) — Low-level container execution
 - **workspace.ts** — Manages isolated execution environments with three directory types: `staging/` (temporary write), `artifacts/` (committed immutable outputs), `caches/` (persistent read-write shared across steps). Two-phase artifact lifecycle: prepare → commit/discard.
-- **docker-executor.ts** — Implements `ContainerExecutor` abstract class using Docker CLI via `execa`. Handles mount configuration (inputs=read-only, output=read-write, caches=read-write, host mounts=read-only), environment isolation (only PATH/HOME/DOCKER_* forwarded), log streaming, and container cleanup.
+- **docker-executor.ts** — Implements `ContainerExecutor` abstract class using Docker CLI via `execa`. Uses `docker create` + `docker cp` + `docker start` lifecycle. Handles mount configuration (inputs=read-only, output=read-write, caches=read-write, host mounts=read-only, sources=copied into container layer), environment isolation (only PATH/HOME/DOCKER_* forwarded), log streaming via `subprocess.iterable()`, and container cleanup.
 - **executor.ts** — Abstract `ContainerExecutor` base class for pluggable runtimes.
 
 ### CLI Layer (`src/cli/`) — High-level orchestration
@@ -37,12 +37,12 @@ Two-layer design:
 - **index.ts** — CLI entry point using Commander.js.
 
 ### Kits Layer (`src/kits/`) — Reusable step templates
-- **index.ts** — Kit registry. A `Kit` has a `name` and a `resolve(params)` method that returns a `KitOutput` (image, cmd, env, caches, mounts, allowNetwork). Kits are selected via `uses` in pipeline definitions.
+- **index.ts** — Kit registry. A `Kit` has a `name` and a `resolve(params)` method that returns a `KitOutput` (image, cmd, env, caches, mounts, sources, allowNetwork). Kits are selected via `uses` in pipeline definitions.
 - **builtin/shell.ts** — General-purpose shell command runner. Without `packages`: alpine, no network. With `packages`: debian + apt-get install + apt cache + network. Accepts `run`, `packages`, `image`, `src`.
 - **builtin/node.ts** — Node.js script runner with npm/pnpm/yarn install and cache.
 - **builtin/python.ts** — Python script runner with pip/uv install and cache.
 
-Kit resolution happens in `PipelineLoader.resolveKitStep()`: `uses` selects the kit, `with` passes parameters, and user-level `env`/`caches`/`mounts` merge with kit defaults (user values win).
+Kit resolution happens in `PipelineLoader.resolveKitStep()`: `uses` selects the kit, `with` passes parameters, and user-level `env`/`caches`/`mounts`/`sources` merge with kit defaults (user values win). The `node` kit uses `sources` (not `mounts`) for `src` so that `node_modules` can be created alongside source files in the container's writable layer.
 
 ### Execution Flow
 ```

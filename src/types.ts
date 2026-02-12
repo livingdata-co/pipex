@@ -49,13 +49,13 @@ export type Step = {
   outputPath?: string;
   caches?: CacheSpec[];
   mounts?: MountSpec[];
+  /** Host directories copied into the container's writable layer (not bind-mounted). */
+  sources?: MountSpec[];
   timeoutSec?: number;
   /** When true the pipeline continues even if this step exits non-zero. */
   allowFailure?: boolean;
   /** When true the container gets network access (default: isolated). */
   allowNetwork?: boolean;
-  /** Paths to shadow with empty writable volumes. */
-  shadowPaths?: string[];
 }
 
 /** A pipeline whose steps have all been resolved. */
@@ -88,6 +88,7 @@ export type KitStepDefinition = {
   outputPath?: string;
   caches?: CacheSpec[];
   mounts?: MountSpec[];
+  sources?: MountSpec[];
   timeoutSec?: number;
   allowFailure?: boolean;
   allowNetwork?: boolean;

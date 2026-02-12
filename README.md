@@ -129,7 +129,7 @@ steps:
     inputs: [{ step: build }]
 ```
 
-`uses` and `image`/`cmd` are mutually exclusive. All other step fields (`env`, `inputs`, `mounts`, `caches`, `timeoutSec`, `allowFailure`, `allowNetwork`) remain available and merge with kit defaults (user values take priority). The `src` parameter in `with` generates a read-only mount at `/app` in the container.
+`uses` and `image`/`cmd` are mutually exclusive. All other step fields (`env`, `inputs`, `mounts`, `sources`, `caches`, `timeoutSec`, `allowFailure`, `allowNetwork`) remain available and merge with kit defaults (user values take priority). The `src` parameter in `with` copies the host directory into `/app` in the container's writable layer (see [Sources](#sources)).
 
 #### Available Kits
 
@@ -138,7 +138,7 @@ steps:
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `script` | *(required)* | Script to run (relative to `/app`) |
-| `src` | -- | Host directory to mount at `/app` |
+| `src` | -- | Host directory to copy into `/app` |
 | `version` | `"24"` | Node.js version |
 | `packageManager` | `"npm"` | `"npm"`, `"pnpm"`, or `"yarn"` |
 | `install` | `true` | Run package install before script |
@@ -149,7 +149,7 @@ steps:
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `script` | *(required)* | Script to run (relative to `/app`) |
-| `src` | -- | Host directory to mount at `/app` |
+| `src` | -- | Host directory to copy into `/app` |
 | `version` | `"3.12"` | Python version |
 | `packageManager` | `"pip"` | `"pip"` or `"uv"` |
 | `install` | `true` | Run dependency install before script |
@@ -161,7 +161,7 @@ steps:
 |-----------|---------|-------------|
 | `run` | *(required)* | Shell command to execute |
 | `packages` | -- | Apt packages to install before running |
-| `src` | -- | Host directory to mount at `/app` |
+| `src` | -- | Host directory to mount read-only at `/app` |
 | `image` | `"alpine:3.20"` | Docker image (defaults to `"debian:bookworm-slim"` when `packages` is set) |
 
 When `packages` is provided, the kit automatically switches to a Debian image, enables network access, and provides an `apt-cache` cache. Without packages, it runs on a minimal Alpine image with no network.
@@ -212,6 +212,7 @@ steps:
 | `env` | Record<string, string> | Environment variables |
 | `outputPath` | string | Output mount point (default: `/output`) |
 | `mounts` | MountSpec[] | Host directories to bind mount (read-only) |
+| `sources` | MountSpec[] | Host directories copied into the container's writable layer |
 | `caches` | CacheSpec[] | Persistent caches to mount |
 | `timeoutSec` | number | Execution timeout |
 | `allowFailure` | boolean | Continue pipeline if step fails |
@@ -249,6 +250,26 @@ mounts:
 - Always mounted read-only -- containers cannot modify host files
 
 This means a pipeline at `/project/ci/pipeline.yaml` can only mount subdirectories of `/project/ci/`. Use `/tmp` or `/output` inside the container for writes.
+
+### Sources
+
+Copy host directories into the container's **writable layer**. Unlike bind mounts, copied files live inside the container so the step can create new files and subdirectories alongside them (e.g. `node_modules` after `npm install`).
+
+```yaml
+sources:
+  - host: src/app
+    container: /app
+```
+
+- Same path rules as `mounts` (`host` relative, `container` absolute, no `..`)
+- Files are snapshotted at step start -- changes on the host during execution are not reflected
+- The container can write next to source files without affecting the host
+
+**When to use `sources` vs `mounts`**:
+- Use `sources` when the step needs to write alongside the source files (install dependencies, generate build artifacts next to sources)
+- Use `mounts` when read-only access is sufficient (config files, static data)
+
+Kits use `sources` internally: the `node` kit's `src` parameter copies into `/app` so that `npm install` can create `node_modules`.
 
 ### Caches
 

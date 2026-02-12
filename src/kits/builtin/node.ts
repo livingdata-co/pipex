@@ -63,8 +63,7 @@ export const nodeKit: Kit = {
     }
 
     if (src) {
-      output.mounts = [{host: src, container: '/app'}]
-      output.shadowPaths = ['/app/node_modules']
+      output.sources = [{host: src, container: '/app'}]
     }
 
     return output

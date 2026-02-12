@@ -5,7 +5,7 @@ test('resolve with minimal params (script only)', t => {
   const result = nodeKit.resolve({script: 'index.js'})
   t.is(result.image, 'node:24-alpine')
   t.truthy(result.cmd[2].includes('node /app/index.js'))
-  t.is(result.shadowPaths, undefined)
+  t.is(result.sources, undefined)
 })
 
 test('resolve uses default version and variant', t => {
@@ -37,10 +37,10 @@ test('resolve with install=false skips install command', t => {
   t.truthy(result.cmd[2].includes('node /app/app.js'))
 })
 
-test('resolve with src adds mount and shadowPaths', t => {
+test('resolve with src adds source', t => {
   const result = nodeKit.resolve({script: 'app.js', src: 'myapp'})
-  t.deepEqual(result.mounts, [{host: 'myapp', container: '/app'}])
-  t.deepEqual(result.shadowPaths, ['/app/node_modules'])
+  t.deepEqual(result.sources, [{host: 'myapp', container: '/app'}])
+  t.is(result.mounts, undefined)
 })
 
 test('resolve sets allowNetwork to true', t => {

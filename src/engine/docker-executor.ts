@@ -70,13 +70,6 @@ export class DockerCliExecutor extends ContainerExecutor {
       }
     }
 
-    // Shadow paths: anonymous volumes that mask read-only mounts
-    if (request.shadowPaths) {
-      for (const path of request.shadowPaths) {
-        args.push('--mount', `type=volume,dst=${path}`)
-      }
-    }
-
     // Mount output (staging artifact, read-write)
     const outputHostPath = workspace.stagingPath(request.output.stagingArtifactId)
     args.push('-v', `${outputHostPath}:${request.output.containerPath}:rw`, request.image, ...request.cmd)
@@ -86,6 +79,15 @@ export class DockerCliExecutor extends ContainerExecutor {
 
     try {
       await execa('docker', args, {env: this.env})
+
+      // Copy source directories into the container's writable layer.
+      // Unlike bind mounts, copied files live in the container layer,
+      // so the container can create subdirectories (e.g. node_modules).
+      if (request.sources) {
+        for (const source of request.sources) {
+          await execa('docker', ['cp', `${source.hostPath}/.`, `${request.name}:${source.containerPath}`], {env: this.env})
+        }
+      }
 
       const proc = execa('docker', ['start', '-a', request.name], {
         env: this.env,
