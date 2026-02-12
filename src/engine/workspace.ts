@@ -1,4 +1,4 @@
-import {access, mkdir, readdir, rename, rm} from 'node:fs/promises'
+import {access, mkdir, readdir, rename, rm, symlink} from 'node:fs/promises'
 import {randomUUID} from 'node:crypto'
 import {join} from 'node:path'
 
@@ -168,6 +168,20 @@ export class Workspace {
    */
   async commitArtifact(artifactId: string): Promise<void> {
     await rename(this.stagingPath(artifactId), this.artifactPath(artifactId))
+  }
+
+  /**
+   * Creates a symlink from `step-artifacts/{stepId}` to the committed artifact.
+   * Replaces any existing symlink for the same step.
+   * @param stepId - Step identifier
+   * @param artifactId - Committed artifact identifier
+   */
+  async linkArtifact(stepId: string, artifactId: string): Promise<void> {
+    const dir = join(this.root, 'step-artifacts')
+    await mkdir(dir, {recursive: true})
+    const linkPath = join(dir, stepId)
+    await rm(linkPath, {force: true})
+    await symlink(join('..', 'artifacts', artifactId), linkPath)
   }
 
   /**

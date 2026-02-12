@@ -132,6 +132,7 @@ export class PipelineRunner {
 
       if (result.exitCode === 0 || step.allowFailure) {
         await workspace.commitArtifact(artifactId)
+        await workspace.linkArtifact(step.id, artifactId)
         stepArtifacts.set(step.id, artifactId)
 
         state.setStep(step.id, artifactId, currentFingerprint)
@@ -170,6 +171,7 @@ export class PipelineRunner {
         const artifacts = await workspace.listArtifacts()
         if (artifacts.includes(cached.artifactId)) {
           stepArtifacts.set(step.id, cached.artifactId)
+          await workspace.linkArtifact(step.id, cached.artifactId)
           this.reporter.state(workspace.id, 'STEP_SKIPPED', stepRef, {artifactId: cached.artifactId, reason: 'cached'})
           return true
         }
