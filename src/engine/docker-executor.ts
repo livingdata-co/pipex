@@ -38,7 +38,10 @@ export class DockerCliExecutor extends ContainerExecutor {
     onLogLine: OnLogLine
   ): Promise<RunContainerResult> {
     const startedAt = new Date()
-    const args = ['run', '--name', request.name, '--network', request.network]
+    // Use create+start instead of run: docker run cannot create mountpoints
+    // for anonymous volumes inside read-only bind mounts (shadow paths).
+    // docker create sets up the filesystem layer before readonly applies.
+    const args = ['create', '--name', request.name, '--network', request.network]
 
     if (request.env) {
       for (const [key, value] of Object.entries(request.env)) {
@@ -82,7 +85,9 @@ export class DockerCliExecutor extends ContainerExecutor {
     let error: string | undefined
 
     try {
-      const proc = execa('docker', args, {
+      await execa('docker', args, {env: this.env})
+
+      const proc = execa('docker', ['start', '-a', request.name], {
         env: this.env,
         reject: false,
         timeout: request.timeoutSec ? request.timeoutSec * 1000 : undefined
