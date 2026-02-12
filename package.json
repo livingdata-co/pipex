@@ -1,6 +1,6 @@
 {
   "name": "@livingdata/pipex",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "Execution engine for containerized pipeline steps",
   "author": "Jérôme Desboeufs <jerome@livingdata.co>",
   "type": "module",
