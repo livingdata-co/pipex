@@ -1,6 +1,5 @@
 import process from 'node:process'
 import {execa} from 'execa'
-import {createInterface} from 'node:readline'
 import type {RunContainerRequest, RunContainerResult} from './types.js'
 import {ContainerExecutor, type OnLogLine} from './executor.js'
 import type {Workspace} from './workspace.js'
@@ -89,21 +88,20 @@ export class DockerCliExecutor extends ContainerExecutor {
         timeout: request.timeoutSec ? request.timeoutSec * 1000 : undefined
       })
 
-      if (proc.stdout) {
-        const rl = createInterface({input: proc.stdout})
-        rl.on('line', line => {
+      const stdoutDone = (async () => {
+        for await (const line of proc.iterable({from: 'stdout'})) {
           onLogLine({stream: 'stdout', line})
-        })
-      }
+        }
+      })()
 
-      if (proc.stderr) {
-        const rl = createInterface({input: proc.stderr})
-        rl.on('line', line => {
+      const stderrDone = (async () => {
+        for await (const line of proc.iterable({from: 'stderr'})) {
           onLogLine({stream: 'stderr', line})
-        })
-      }
+        }
+      })()
 
       const result = await proc
+      await Promise.all([stdoutDone, stderrDone])
       exitCode = result.exitCode ?? 0
     } catch (error_) {
       exitCode = 1
