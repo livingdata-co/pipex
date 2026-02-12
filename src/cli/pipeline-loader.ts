@@ -66,7 +66,8 @@ export class PipelineLoader {
       mounts: mergeMounts(kitOutput.mounts, step.mounts),
       timeoutSec: step.timeoutSec,
       allowFailure: step.allowFailure,
-      allowNetwork: step.allowNetwork ?? kitOutput.allowNetwork
+      allowNetwork: step.allowNetwork ?? kitOutput.allowNetwork,
+      shadowPaths: kitOutput.shadowPaths
     }
   }
 

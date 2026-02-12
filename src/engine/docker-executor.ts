@@ -68,6 +68,13 @@ export class DockerCliExecutor extends ContainerExecutor {
       }
     }
 
+    // Shadow paths: anonymous volumes that mask read-only mounts
+    if (request.shadowPaths) {
+      for (const path of request.shadowPaths) {
+        args.push('--mount', `type=volume,dst=${path}`)
+      }
+    }
+
     // Mount output (staging artifact, read-write)
     const outputHostPath = workspace.stagingPath(request.output.stagingArtifactId)
     args.push('-v', `${outputHostPath}:${request.output.containerPath}:rw`, request.image, ...request.cmd)
@@ -103,7 +110,7 @@ export class DockerCliExecutor extends ContainerExecutor {
       error = error_ instanceof Error ? error_.message : String(error_)
     } finally {
       try {
-        await execa('docker', ['rm', '-f', request.name], {env: this.env, reject: false})
+        await execa('docker', ['rm', '-f', '-v', request.name], {env: this.env, reject: false})
       } catch {
         // Best effort cleanup
       }

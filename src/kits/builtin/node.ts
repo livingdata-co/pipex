@@ -9,15 +9,15 @@ const cacheMap: Record<string, {name: string; path: string}> = {
 function buildInstallCommand(packageManager: string): string {
   switch (packageManager) {
     case 'npm': {
-      return 'cd /tmp && cp /app/package*.json . && npm install --no-audit --no-fund 2>&1'
+      return 'cd /app && npm install --no-package-lock --no-audit --no-fund 2>&1'
     }
 
     case 'pnpm': {
-      return 'cd /tmp && cp /app/package.json . && cp /app/pnpm-lock.yaml . 2>/dev/null; pnpm install --no-frozen-lockfile 2>&1'
+      return 'cd /app && pnpm install --no-frozen-lockfile 2>&1'
     }
 
     case 'yarn': {
-      return 'cd /tmp && cp /app/package.json . && cp /app/yarn.lock . 2>/dev/null; yarn install 2>&1'
+      return 'cd /app && yarn install 2>&1'
     }
 
     default: {
@@ -48,8 +48,7 @@ export const nodeKit: Kit = {
       parts.push(buildInstallCommand(packageManager))
     }
 
-    const nodePathPrefix = install ? 'NODE_PATH=/tmp/node_modules ' : ''
-    parts.push(`${nodePathPrefix}node /app/${script}`)
+    parts.push(`node /app/${script}`)
 
     const cache = cacheMap[packageManager]
     if (!cache) {
@@ -65,6 +64,7 @@ export const nodeKit: Kit = {
 
     if (src) {
       output.mounts = [{host: src, container: '/app'}]
+      output.shadowPaths = ['/app/node_modules']
     }
 
     return output

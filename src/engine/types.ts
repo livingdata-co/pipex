@@ -76,6 +76,8 @@ export type RunContainerRequest = {
   network: 'none' | 'bridge';
   /** Execution timeout in seconds (undefined = no timeout) */
   timeoutSec?: number;
+  /** Paths to shadow with anonymous writable volumes */
+  shadowPaths?: string[];
 }
 
 /**

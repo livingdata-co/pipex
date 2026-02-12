@@ -117,7 +117,8 @@ export class PipelineRunner {
           caches,
           mounts,
           network: step.allowNetwork ? 'bridge' : 'none',
-          timeoutSec: step.timeoutSec
+          timeoutSec: step.timeoutSec,
+          shadowPaths: step.shadowPaths
         },
         ({stream, line}) => {
           this.reporter.log(workspace.id, stepRef, stream, line)

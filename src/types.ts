@@ -54,6 +54,8 @@ export type Step = {
   allowFailure?: boolean;
   /** When true the container gets network access (default: isolated). */
   allowNetwork?: boolean;
+  /** Paths to shadow with empty writable volumes. */
+  shadowPaths?: string[];
 }
 
 /** A pipeline whose steps have all been resolved. */
