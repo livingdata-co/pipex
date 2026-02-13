@@ -2,6 +2,7 @@ import pino from 'pino'
 import chalk from 'chalk'
 import ora, {type Ora} from 'ora'
 import type {RunContainerResult} from '../engine/types.js'
+import {formatDuration, formatSize} from './utils.js'
 
 /**
  * Events emitted during pipeline execution.
@@ -13,6 +14,7 @@ import type {RunContainerResult} from '../engine/types.js'
  *    b. STEP_FINISHED - Step succeeded
  *       OR STEP_FAILED - Step failed (pipeline stops unless allowFailure)
  *       OR STEP_SKIPPED - Step skipped due to cache hit
+ *       OR STEP_WOULD_RUN - Step would run (dry-run mode)
  * 3. PIPELINE_FINISHED - All steps completed successfully
  *    OR PIPELINE_FAILED - Pipeline stopped due to step failure
  */
@@ -22,6 +24,7 @@ export type PipelineEvent =
   | 'STEP_SKIPPED'
   | 'STEP_FINISHED'
   | 'STEP_FAILED'
+  | 'STEP_WOULD_RUN'
   | 'PIPELINE_FINISHED'
   | 'PIPELINE_FAILED'
 
@@ -73,9 +76,14 @@ export class InteractiveReporter implements Reporter {
     return 20
   }
 
+  private readonly verbose: boolean
   private readonly spinner?: Ora
   private readonly stepSpinners = new Map<string, Ora>()
   private readonly stderrBuffers = new Map<string, string[]>()
+
+  constructor(options?: {verbose?: boolean}) {
+    this.verbose = options?.verbose ?? false
+  }
 
   state(workspaceId: string, event: PipelineEvent, step?: StepRef, meta?: Record<string, unknown>): void {
     switch (event) {
@@ -110,13 +118,7 @@ export class InteractiveReporter implements Reporter {
 
       case 'STEP_FINISHED': {
         if (step) {
-          const spinner = this.stepSpinners.get(step.id)
-          if (spinner) {
-            spinner.stopAndPersist({symbol: chalk.green('✓'), text: chalk.green(step.displayName)})
-            this.stepSpinners.delete(step.id)
-          }
-
-          this.stderrBuffers.delete(step.id)
+          this.handleStepFinished(step, meta)
         }
 
         break
@@ -130,8 +132,16 @@ export class InteractiveReporter implements Reporter {
         break
       }
 
+      case 'STEP_WOULD_RUN': {
+        if (step) {
+          this.handleStepWouldRun(step)
+        }
+
+        break
+      }
+
       case 'PIPELINE_FINISHED': {
-        console.log(chalk.bold.green('\n✓ Pipeline completed\n'))
+        this.handlePipelineFinished(meta)
         break
       }
 
@@ -143,6 +153,18 @@ export class InteractiveReporter implements Reporter {
   }
 
   log(_workspaceId: string, step: StepRef, stream: 'stdout' | 'stderr', line: string): void {
+    if (this.verbose) {
+      const spinner = this.stepSpinners.get(step.id)
+      const prefix = chalk.gray(`  [${step.id}]`)
+      if (spinner) {
+        spinner.clear()
+        console.log(`${prefix} ${line}`)
+        spinner.render()
+      } else {
+        console.log(`${prefix} ${line}`)
+      }
+    }
+
     if (stream === 'stderr') {
       let buffer = this.stderrBuffers.get(step.id)
       if (!buffer) {
@@ -159,6 +181,45 @@ export class InteractiveReporter implements Reporter {
 
   result(_workspaceId: string, _step: StepRef, _result: RunContainerResult): void {
     // Results shown via state updates
+  }
+
+  private handleStepFinished(step: StepRef, meta?: Record<string, unknown>): void {
+    const spinner = this.stepSpinners.get(step.id)
+    if (spinner) {
+      const details: string[] = []
+      if (typeof meta?.durationMs === 'number') {
+        details.push(formatDuration(meta.durationMs))
+      }
+
+      if (typeof meta?.artifactSize === 'number' && meta.artifactSize > 0) {
+        details.push(formatSize(meta.artifactSize))
+      }
+
+      const suffix = details.length > 0 ? ` (${details.join(', ')})` : ''
+      spinner.stopAndPersist({symbol: chalk.green('✓'), text: chalk.green(`${step.displayName}${suffix}`)})
+      this.stepSpinners.delete(step.id)
+    }
+
+    this.stderrBuffers.delete(step.id)
+  }
+
+  private handleStepWouldRun(step: StepRef): void {
+    const spinner = this.stepSpinners.get(step.id)
+    if (spinner) {
+      spinner.stopAndPersist({symbol: chalk.yellow('○'), text: chalk.yellow(`${step.displayName} (would run)`)})
+      this.stepSpinners.delete(step.id)
+    } else {
+      console.log(`  ${chalk.yellow('○')} ${chalk.yellow(`${step.displayName} (would run)`)}`)
+    }
+  }
+
+  private handlePipelineFinished(meta?: Record<string, unknown>): void {
+    const parts = ['Pipeline completed']
+    if (typeof meta?.totalArtifactSize === 'number' && meta.totalArtifactSize > 0) {
+      parts.push(`(${formatSize(meta.totalArtifactSize)})`)
+    }
+
+    console.log(chalk.bold.green(`\n✓ ${parts.join(' ')}\n`))
   }
 
   private handleStepFailed(step: StepRef, meta?: Record<string, unknown>): void {

@@ -6,6 +6,7 @@ import type {Step} from '../types.js'
 import type {Reporter, StepRef} from './reporter.js'
 import type {PipelineLoader} from './pipeline-loader.js'
 import {StateManager} from './state.js'
+import {dirSize} from './utils.js'
 
 /**
  * Orchestrates pipeline execution with dependency resolution and caching.
@@ -38,8 +39,8 @@ export class PipelineRunner {
     private readonly workdirRoot: string
   ) {}
 
-  async run(pipelineFilePath: string, options?: {workspace?: string; force?: true | string[]}): Promise<void> {
-    const {workspace: workspaceName, force} = options ?? {}
+  async run(pipelineFilePath: string, options?: {workspace?: string; force?: true | string[]; dryRun?: boolean}): Promise<void> {
+    const {workspace: workspaceName, force, dryRun} = options ?? {}
     const config = await this.loader.load(pipelineFilePath)
     const pipelineRoot = dirname(resolve(pipelineFilePath))
 
@@ -53,12 +54,15 @@ export class PipelineRunner {
     }
 
     await workspace.cleanupStaging()
-    await this.runtime.check()
-    await this.runtime.cleanupContainers(workspace.id)
+    if (!dryRun) {
+      await this.runtime.check()
+      await this.runtime.cleanupContainers(workspace.id)
+    }
 
     const state = new StateManager(workspace.root)
     await state.load()
     const stepRuns = new Map<string, string>()
+    let totalArtifactSize = 0
 
     this.reporter.state(workspace.id, 'PIPELINE_START', undefined, {pipelineName: config.name ?? config.id})
 
@@ -84,11 +88,17 @@ export class PipelineRunner {
         continue
       }
 
+      if (dryRun) {
+        this.reporter.state(workspace.id, 'STEP_WOULD_RUN', stepRef)
+        continue
+      }
+
       this.reporter.state(workspace.id, 'STEP_STARTING', stepRef)
-      await this.executeStep({workspace, state, step, stepRef, stepRuns, currentFingerprint, resolvedMounts, pipelineRoot})
+      const stepArtifactSize = await this.executeStep({workspace, state, step, stepRef, stepRuns, currentFingerprint, resolvedMounts, pipelineRoot})
+      totalArtifactSize += stepArtifactSize
     }
 
-    this.reporter.state(workspace.id, 'PIPELINE_FINISHED')
+    this.reporter.state(workspace.id, 'PIPELINE_FINISHED', undefined, {totalArtifactSize})
   }
 
   private async executeStep({workspace, state, step, stepRef, stepRuns, currentFingerprint, resolvedMounts, pipelineRoot}: {
@@ -100,7 +110,7 @@ export class PipelineRunner {
     currentFingerprint: string;
     resolvedMounts?: Array<{hostPath: string; containerPath: string}>;
     pipelineRoot: string;
-  }): Promise<void> {
+  }): Promise<number> {
     const runId = workspace.generateRunId()
     const stagingPath = await workspace.prepareRun(runId)
 
@@ -162,13 +172,16 @@ export class PipelineRunner {
         state.setStep(step.id, runId, currentFingerprint)
         await state.save()
 
-        this.reporter.state(workspace.id, 'STEP_FINISHED', stepRef, {runId})
-      } else {
-        await workspace.discardRun(runId)
-        this.reporter.state(workspace.id, 'STEP_FAILED', stepRef, {exitCode: result.exitCode})
-        this.reporter.state(workspace.id, 'PIPELINE_FAILED')
-        throw new Error(`Step ${step.id} failed with exit code ${result.exitCode}`)
+        const durationMs = result.finishedAt.getTime() - result.startedAt.getTime()
+        const artifactSize = await dirSize(workspace.runArtifactsPath(runId))
+        this.reporter.state(workspace.id, 'STEP_FINISHED', stepRef, {runId, durationMs, artifactSize})
+        return artifactSize
       }
+
+      await workspace.discardRun(runId)
+      this.reporter.state(workspace.id, 'STEP_FAILED', stepRef, {exitCode: result.exitCode})
+      this.reporter.state(workspace.id, 'PIPELINE_FAILED')
+      throw new Error(`Step ${step.id} failed with exit code ${result.exitCode}`)
     } catch (error) {
       await closeStream(stdoutLog)
       await closeStream(stderrLog)

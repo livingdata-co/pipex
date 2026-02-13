@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import 'dotenv/config'
 import process from 'node:process'
-import {readFile} from 'node:fs/promises'
+import {cp, readFile} from 'node:fs/promises'
 import {join, resolve} from 'node:path'
 import chalk from 'chalk'
 import {Command} from 'commander'
@@ -11,6 +11,7 @@ import {PipelineLoader} from './pipeline-loader.js'
 import {PipelineRunner} from './pipeline-runner.js'
 import {ConsoleReporter, InteractiveReporter} from './reporter.js'
 import {StateManager} from './state.js'
+import {dirSize, formatSize} from './utils.js'
 
 type GlobalOptions = {
   workdir: string;
@@ -37,20 +38,22 @@ async function main() {
     .argument('<pipeline>', 'Pipeline file to execute (JSON or YAML)')
     .option('-w, --workspace <name>', 'Workspace name (for caching)')
     .option('-f, --force [steps]', 'Skip cache for all steps, or a comma-separated list (e.g. --force step1,step2)')
-    .action(async (pipelineFile: string, options: {workspace?: string; force?: string | boolean}, cmd: Command) => {
+    .option('--dry-run', 'Validate pipeline and show what would run without executing')
+    .option('--verbose', 'Stream container logs in real-time (interactive mode)')
+    .action(async (pipelineFile: string, options: {workspace?: string; force?: string | boolean; dryRun?: boolean; verbose?: boolean}, cmd: Command) => {
       const {workdir, json} = getGlobalOptions(cmd)
       const workdirRoot = resolve(workdir)
       const loader = new PipelineLoader()
       const runtime = new DockerCliExecutor()
 
-      const reporter = json ? new ConsoleReporter() : new InteractiveReporter()
+      const reporter = json ? new ConsoleReporter() : new InteractiveReporter({verbose: options.verbose})
       const runner = new PipelineRunner(loader, runtime, reporter, workdirRoot)
 
       try {
         const force = options.force === true
           ? true
           : (typeof options.force === 'string' ? options.force.split(',') : undefined)
-        await runner.run(pipelineFile, {workspace: options.workspace, force})
+        await runner.run(pipelineFile, {workspace: options.workspace, force, dryRun: options.dryRun})
         if (json) {
           console.log('Pipeline completed')
         }
@@ -167,6 +170,33 @@ async function main() {
     })
 
   program
+    .command('export')
+    .description('Extract artifacts from a step run to the host filesystem')
+    .argument('<workspace>', 'Workspace name')
+    .argument('<step>', 'Step ID')
+    .argument('<dest>', 'Destination directory')
+    .action(async (workspaceName: string, stepId: string, dest: string, cmd: Command) => {
+      const {workdir} = getGlobalOptions(cmd)
+      const workdirRoot = resolve(workdir)
+
+      const workspace = await Workspace.open(workdirRoot, workspaceName)
+      const state = new StateManager(workspace.root)
+      await state.load()
+
+      const stepState = state.getStep(stepId)
+      if (!stepState) {
+        console.error(chalk.red(`No run found for step: ${stepId}`))
+        process.exitCode = 1
+        return
+      }
+
+      const artifactsPath = workspace.runArtifactsPath(stepState.runId)
+      const destPath = resolve(dest)
+      await cp(artifactsPath, destPath, {recursive: true})
+      console.log(chalk.green(`Exported artifacts from ${stepId} to ${destPath}`))
+    })
+
+  program
     .command('show')
     .description('Show steps and runs in a workspace')
     .argument('<workspace>', 'Workspace name')
@@ -185,23 +215,27 @@ async function main() {
         return
       }
 
-      const rows: Array<{stepId: string; stepName?: string; status: string; duration: string; date: string; runId: string}> = []
+      const rows: Array<{stepId: string; stepName?: string; status: string; duration: string; size: string; date: string; runId: string}> = []
 
+      let totalSize = 0
       for (const {stepId, runId} of steps) {
         const metaPath = join(workspace.runPath(runId), 'meta.json')
         try {
           const content = await readFile(metaPath, 'utf8')
           const meta = JSON.parse(content) as Record<string, unknown>
+          const artifactBytes = await dirSize(workspace.runArtifactsPath(runId))
+          totalSize += artifactBytes
           rows.push({
             stepId,
             stepName: meta.stepName as string | undefined,
             status: meta.status as string,
             duration: `${meta.durationMs as number}ms`,
+            size: formatSize(artifactBytes),
             date: (meta.finishedAt as string).replace('T', ' ').replace(/\.\d+Z$/, ''),
             runId
           })
         } catch {
-          rows.push({stepId, status: 'unknown', duration: '-', date: '-', runId})
+          rows.push({stepId, status: 'unknown', duration: '-', size: '-', date: '-', runId})
         }
       }
 
@@ -213,17 +247,28 @@ async function main() {
       const stepWidth = Math.max('STEP'.length, ...rows.map(r => (r.stepName ? `${r.stepId} (${r.stepName})` : r.stepId).length))
       const statusWidth = Math.max('STATUS'.length, ...rows.map(r => r.status.length))
       const durationWidth = Math.max('DURATION'.length, ...rows.map(r => r.duration.length))
+      const sizeWidth = Math.max('SIZE'.length, ...rows.map(r => r.size.length))
       const dateWidth = Math.max('FINISHED'.length, ...rows.map(r => r.date.length))
 
       console.log(chalk.bold(
-        `${'STEP'.padEnd(stepWidth)}  ${'STATUS'.padEnd(statusWidth)}  ${'DURATION'.padStart(durationWidth)}  ${'FINISHED'.padEnd(dateWidth)}`
+        `${'STEP'.padEnd(stepWidth)}  ${'STATUS'.padEnd(statusWidth)}  ${'DURATION'.padStart(durationWidth)}  ${'SIZE'.padStart(sizeWidth)}  ${'FINISHED'.padEnd(dateWidth)}`
       ))
       for (const row of rows) {
         const stepLabel = row.stepName ? `${row.stepId} (${row.stepName})` : row.stepId
         const statusText = row.status === 'success' ? chalk.green(row.status) : chalk.red(row.status)
-        console.log(
-          `${stepLabel.padEnd(stepWidth)}  ${statusText.padEnd(statusWidth + (statusText.length - row.status.length))}  ${row.duration.padStart(durationWidth)}  ${row.date.padEnd(dateWidth)}`
-        )
+        const statusPad = statusWidth + (statusText.length - row.status.length)
+        const cols = [
+          stepLabel.padEnd(stepWidth),
+          statusText.padEnd(statusPad),
+          row.duration.padStart(durationWidth),
+          row.size.padStart(sizeWidth),
+          row.date.padEnd(dateWidth)
+        ]
+        console.log(cols.join('  '))
+      }
+
+      if (rows.length > 1) {
+        console.log(chalk.gray(`\n  Total: ${formatSize(totalSize)}`))
       }
     })
 
@@ -268,19 +313,21 @@ async function main() {
         return
       }
 
-      const rows: Array<{name: string; runs: number; caches: number}> = []
+      const rows: Array<{name: string; runs: number; caches: number; size: string}> = []
       for (const name of names) {
         const ws = await Workspace.open(workdirRoot, name)
         const runs = await ws.listRuns()
         const caches = await ws.listCaches()
-        rows.push({name, runs: runs.length, caches: caches.length})
+        const wsSize = await dirSize(ws.root)
+        rows.push({name, runs: runs.length, caches: caches.length, size: formatSize(wsSize)})
       }
 
       const nameWidth = Math.max('WORKSPACE'.length, ...rows.map(r => r.name.length))
-      const header = `${'WORKSPACE'.padEnd(nameWidth)}  RUNS  CACHES`
+      const sizeWidth = Math.max('SIZE'.length, ...rows.map(r => r.size.length))
+      const header = `${'WORKSPACE'.padEnd(nameWidth)}  RUNS  CACHES  ${'SIZE'.padStart(sizeWidth)}`
       console.log(chalk.bold(header))
       for (const row of rows) {
-        console.log(`${row.name.padEnd(nameWidth)}  ${String(row.runs).padStart(4)}  ${String(row.caches).padStart(6)}`)
+        console.log(`${row.name.padEnd(nameWidth)}  ${String(row.runs).padStart(4)}  ${String(row.caches).padStart(6)}  ${row.size.padStart(sizeWidth)}`)
       }
     })
 

@@ -42,7 +42,7 @@ pipex run pipeline.yaml --workdir /tmp/builds
 Each step execution produces a **run** containing artifacts, logs (stdout/stderr), and metadata:
 
 ```bash
-# Show all steps and their last run (status, duration, date)
+# Show all steps and their last run (status, duration, size, date)
 pipex show my-pipeline
 
 # Show logs from the last run of a step
@@ -52,12 +52,15 @@ pipex logs my-pipeline download --stream stderr
 # Show execution metadata (image, cmd, duration, exit code, fingerprint…)
 pipex inspect my-pipeline download
 pipex inspect my-pipeline download --json
+
+# Export artifacts from a step to the host filesystem
+pipex export my-pipeline download ./output-dir
 ```
 
 ### Managing workspaces
 
 ```bash
-# List workspaces (with run/cache counts)
+# List workspaces (with run/cache counts and disk size)
 pipex list
 pipex ls --json
 
@@ -76,11 +79,12 @@ pipex clean
 | Command | Description |
 |---------|-------------|
 | `run <pipeline>` | Execute a pipeline |
-| `show <workspace>` | Show steps and runs in a workspace |
+| `show <workspace>` | Show steps and runs in a workspace (with artifact sizes) |
 | `logs <workspace> <step>` | Show stdout/stderr from last run |
 | `inspect <workspace> <step>` | Show run metadata (meta.json) |
+| `export <workspace> <step> <dest>` | Extract artifacts from a step run to the host filesystem |
 | `prune <workspace>` | Remove old runs not referenced by current state |
-| `list` (alias `ls`) | List workspaces |
+| `list` (alias `ls`) | List workspaces (with disk sizes) |
 | `rm <workspace...>` | Remove one or more workspaces |
 | `clean` | Remove all workspaces |
 
@@ -97,6 +101,8 @@ pipex clean
 |--------|-------|-------------|
 | `--workspace <name>` | `-w` | Workspace name for caching |
 | `--force [steps]` | `-f` | Skip cache for all steps, or a comma-separated list |
+| `--dry-run` | | Validate pipeline, compute fingerprints, show what would run without executing |
+| `--verbose` | | Stream container logs in real-time (interactive mode) |
 
 ## Pipeline Format
 
