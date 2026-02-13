@@ -38,6 +38,13 @@ export abstract class ContainerExecutor {
   abstract check(): Promise<void>
 
   /**
+   * Remove leftover containers for the given workspace.
+   * Called before pipeline execution to clean up after crashes.
+   * @param workspaceId - Workspace identifier
+   */
+  abstract cleanupContainers(workspaceId: string): Promise<void>
+
+  /**
    * Executes a container with the specified configuration.
    * @param workspace - Workspace for resolving artifact paths
    * @param request - Execution configuration (image, cmd, mounts, env)

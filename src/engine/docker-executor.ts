@@ -32,6 +32,25 @@ export class DockerCliExecutor extends ContainerExecutor {
     }
   }
 
+  /**
+   * Remove any leftover pipex containers for the given workspace.
+   * Called before pipeline execution to clean up after crashes.
+   */
+  async cleanupContainers(workspaceId: string): Promise<void> {
+    try {
+      const {stdout} = await execa('docker', [
+        'ps', '-a', '--filter', `label=pipex.workspace=${workspaceId}`, '-q'
+      ], {env: this.env})
+
+      const ids = stdout.trim().split('\n').filter(Boolean)
+      if (ids.length > 0) {
+        await execa('docker', ['rm', '-f', ...ids], {env: this.env, reject: false})
+      }
+    } catch {
+      // Best effort
+    }
+  }
+
   async run(
     workspace: Workspace,
     request: RunContainerRequest,
@@ -41,7 +60,7 @@ export class DockerCliExecutor extends ContainerExecutor {
     // Use create+start instead of run: docker run cannot create mountpoints
     // for anonymous volumes inside read-only bind mounts (shadow paths).
     // docker create sets up the filesystem layer before readonly applies.
-    const args = ['create', '--name', request.name, '--network', request.network]
+    const args = ['create', '--name', request.name, '--network', request.network, '--label', 'pipex=true', '--label', `pipex.workspace=${workspace.id}`]
 
     if (request.env) {
       for (const [key, value] of Object.entries(request.env)) {

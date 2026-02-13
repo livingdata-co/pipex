@@ -61,6 +61,9 @@ pipex inspect my-pipeline download --json
 pipex list
 pipex ls --json
 
+# Remove old runs (keeps only current ones)
+pipex prune my-pipeline
+
 # Remove specific workspaces
 pipex rm my-build other-build
 
@@ -76,6 +79,7 @@ pipex clean
 | `show <workspace>` | Show steps and runs in a workspace |
 | `logs <workspace> <step>` | Show stdout/stderr from last run |
 | `inspect <workspace> <step>` | Show run metadata (meta.json) |
+| `prune <workspace>` | Remove old runs not referenced by current state |
 | `list` (alias `ls`) | List workspaces |
 | `rm <workspace...>` | Remove one or more workspaces |
 | `clean` | Remove all workspaces |

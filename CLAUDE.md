@@ -13,6 +13,7 @@ pipex run <pipeline.yaml>                               # Run pipeline (publishe
 pipex show <workspace>                                  # Show steps and runs in a workspace
 pipex logs <workspace> <step>                           # Show logs from last run of a step
 pipex inspect <workspace> <step>                        # Show run metadata
+pipex prune <workspace>                                 # Remove old runs, keep current
 pipex list                                             # List workspaces
 pipex rm <workspace>                                   # Remove workspace
 pipex clean                                            # Remove all workspaces

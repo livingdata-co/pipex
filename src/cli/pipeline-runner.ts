@@ -54,6 +54,7 @@ export class PipelineRunner {
 
     await workspace.cleanupStaging()
     await this.runtime.check()
+    await this.runtime.cleanupContainers(workspace.id)
 
     const state = new StateManager(workspace.root)
     await state.load()

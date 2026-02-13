@@ -228,6 +228,28 @@ async function main() {
     })
 
   program
+    .command('prune')
+    .description('Remove old runs not referenced by current state')
+    .argument('<workspace>', 'Workspace name')
+    .action(async (workspaceName: string, _options: Record<string, unknown>, cmd: Command) => {
+      const {workdir} = getGlobalOptions(cmd)
+      const workdirRoot = resolve(workdir)
+
+      const workspace = await Workspace.open(workdirRoot, workspaceName)
+      const state = new StateManager(workspace.root)
+      await state.load()
+
+      const activeIds = state.activeRunIds()
+      const removed = await workspace.pruneRuns(activeIds)
+
+      if (removed === 0) {
+        console.log(chalk.gray('No old runs to remove.'))
+      } else {
+        console.log(chalk.green(`Removed ${removed} old run${removed > 1 ? 's' : ''}.`))
+      }
+    })
+
+  program
     .command('list')
     .alias('ls')
     .description('List workspaces')

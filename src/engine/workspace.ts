@@ -244,6 +244,24 @@ export class Workspace {
   }
 
   /**
+   * Removes runs not in the given set of active run IDs.
+   * @param activeRunIds - Set of run IDs to keep
+   * @returns Number of runs removed
+   */
+  async pruneRuns(activeRunIds: Set<string>): Promise<number> {
+    const allRuns = await this.listRuns()
+    let removed = 0
+    for (const runId of allRuns) {
+      if (!activeRunIds.has(runId)) {
+        await rm(join(this.root, 'runs', runId), {recursive: true, force: true})
+        removed++
+      }
+    }
+
+    return removed
+  }
+
+  /**
    * Returns the cache directory path.
    * Caches are persistent read-write directories shared across steps.
    * @param cacheName - Cache identifier (e.g., "pnpm-store")

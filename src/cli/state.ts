@@ -120,6 +120,13 @@ export class StateManager {
   }
 
   /**
+   * Returns the set of run IDs currently referenced by state.
+   */
+  activeRunIds(): Set<string> {
+    return new Set(Object.values(this.state.steps).map(s => s.runId))
+  }
+
+  /**
    * Updates cached state for a step.
    * @param stepId - Step identifier
    * @param runId - Run produced by the step
