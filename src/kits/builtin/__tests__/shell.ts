@@ -1,4 +1,5 @@
 import test from 'ava'
+import {MissingParameterError} from '../../../errors.js'
 import {shellKit} from '../shell.js'
 
 // -- Defaults (no packages) --------------------------------------------------
@@ -82,10 +83,12 @@ test('resolve without src has no mounts', t => {
 
 // -- Validation ---------------------------------------------------------------
 
-test('resolve throws without run', t => {
-  t.throws(() => shellKit.resolve({}), {message: /run.*required/i})
+test('resolve throws MissingParameterError without run', t => {
+  const error = t.throws(() => shellKit.resolve({}), {message: /run.*required/i})
+  t.true(error instanceof MissingParameterError)
 })
 
-test('resolve throws without run even with packages', t => {
-  t.throws(() => shellKit.resolve({packages: ['curl']}), {message: /run.*required/i})
+test('resolve throws MissingParameterError without run even with packages', t => {
+  const error = t.throws(() => shellKit.resolve({packages: ['curl']}), {message: /run.*required/i})
+  t.true(error instanceof MissingParameterError)
 })

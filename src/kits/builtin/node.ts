@@ -1,3 +1,4 @@
+import {KitError, MissingParameterError} from '../../errors.js'
 import type {Kit, KitOutput} from '../index.js'
 
 const cacheMap: Record<string, {name: string; path: string}> = {
@@ -21,7 +22,7 @@ function buildInstallCommand(packageManager: string): string {
     }
 
     default: {
-      throw new Error(`Kit "node": unsupported packageManager "${packageManager}"`)
+      throw new KitError('UNSUPPORTED_PACKAGE_MANAGER', `Kit "node": unsupported packageManager "${packageManager}"`)
     }
   }
 }
@@ -37,7 +38,7 @@ export const nodeKit: Kit = {
     const src = params.src as string | undefined
 
     if (!script || typeof script !== 'string') {
-      throw new Error('Kit "node": "script" parameter is required')
+      throw new MissingParameterError('node', 'script')
     }
 
     const image = `node:${version}-${variant}`
@@ -52,7 +53,7 @@ export const nodeKit: Kit = {
 
     const cache = cacheMap[packageManager]
     if (!cache) {
-      throw new Error(`Kit "node": unsupported packageManager "${packageManager}"`)
+      throw new KitError('UNSUPPORTED_PACKAGE_MANAGER', `Kit "node": unsupported packageManager "${packageManager}"`)
     }
 
     const output: KitOutput = {

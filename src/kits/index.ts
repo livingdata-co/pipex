@@ -1,3 +1,4 @@
+import {KitError} from '../errors.js'
 import type {Step} from '../types.js'
 import {nodeKit} from './builtin/node.js'
 import {pythonKit} from './builtin/python.js'
@@ -19,7 +20,7 @@ const kits = new Map<string, Kit>([
 export function getKit(name: string): Kit {
   const kit = kits.get(name)
   if (!kit) {
-    throw new Error(`Unknown kit: "${name}". Available kits: ${[...kits.keys()].join(', ')}`)
+    throw new KitError('UNKNOWN_KIT', `Unknown kit: "${name}". Available kits: ${[...kits.keys()].join(', ')}`)
   }
 
   return kit

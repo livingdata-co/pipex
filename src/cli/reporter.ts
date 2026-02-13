@@ -24,6 +24,7 @@ export type PipelineEvent =
   | 'STEP_SKIPPED'
   | 'STEP_FINISHED'
   | 'STEP_FAILED'
+  | 'STEP_RETRYING'
   | 'STEP_WOULD_RUN'
   | 'PIPELINE_FINISHED'
   | 'PIPELINE_FAILED'
@@ -127,6 +128,19 @@ export class InteractiveReporter implements Reporter {
       case 'STEP_FAILED': {
         if (step) {
           this.handleStepFailed(step, meta)
+        }
+
+        break
+      }
+
+      case 'STEP_RETRYING': {
+        if (step) {
+          const attempt = meta?.attempt as number | undefined
+          const maxRetries = meta?.maxRetries as number | undefined
+          const spinner = this.stepSpinners.get(step.id)
+          if (spinner) {
+            spinner.text = `${step.displayName} (retry ${attempt}/${maxRetries})`
+          }
         }
 
         break

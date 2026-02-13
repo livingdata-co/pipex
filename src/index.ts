@@ -50,3 +50,22 @@ export {
   type LogLine,
   type OnLogLine
 } from './engine/index.js'
+
+export {
+  PipexError,
+  DockerError,
+  DockerNotAvailableError,
+  ImagePullError,
+  ContainerTimeoutError,
+  ContainerCrashError,
+  ContainerCleanupError,
+  WorkspaceError,
+  ArtifactNotFoundError,
+  StagingError,
+  PipelineError,
+  ValidationError,
+  CyclicDependencyError,
+  StepNotFoundError,
+  KitError,
+  MissingParameterError
+} from './errors.js'

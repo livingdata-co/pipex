@@ -1,3 +1,4 @@
+import {KitError, MissingParameterError} from '../../errors.js'
 import type {Kit, KitOutput} from '../index.js'
 
 const cacheMap: Record<string, {name: string; path: string}> = {
@@ -16,7 +17,7 @@ function buildInstallCommand(packageManager: string): string {
     }
 
     default: {
-      throw new Error(`Kit "python": unsupported packageManager "${packageManager}"`)
+      throw new KitError('UNSUPPORTED_PACKAGE_MANAGER', `Kit "python": unsupported packageManager "${packageManager}"`)
     }
   }
 }
@@ -32,14 +33,14 @@ export const pythonKit: Kit = {
     const src = params.src as string | undefined
 
     if (!script || typeof script !== 'string') {
-      throw new Error('Kit "python": "script" parameter is required')
+      throw new MissingParameterError('python', 'script')
     }
 
     const image = `python:${version}-${variant}`
 
     const cache = cacheMap[packageManager]
     if (!cache) {
-      throw new Error(`Kit "python": unsupported packageManager "${packageManager}"`)
+      throw new KitError('UNSUPPORTED_PACKAGE_MANAGER', `Kit "python": unsupported packageManager "${packageManager}"`)
     }
 
     const parts: string[] = []

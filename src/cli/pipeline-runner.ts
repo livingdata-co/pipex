@@ -1,7 +1,9 @@
 import {cp, writeFile} from 'node:fs/promises'
+import {setTimeout} from 'node:timers/promises'
 import {createWriteStream, type WriteStream} from 'node:fs'
 import {dirname, join, resolve} from 'node:path'
 import {Workspace, type ContainerExecutor, type InputMount, type OutputMount, type CacheMount, type BindMount} from '../engine/index.js'
+import {ContainerCrashError, StepNotFoundError, PipexError} from '../errors.js'
 import type {Step} from '../types.js'
 import type {Reporter, StepRef} from './reporter.js'
 import type {PipelineLoader} from './pipeline-loader.js'
@@ -128,34 +130,51 @@ export class PipelineRunner {
     const stderrLog = createWriteStream(join(stagingPath, 'stderr.log'))
 
     try {
-      const result = await this.runtime.run(
-        workspace,
-        {
-          name: `pipex-${workspace.id}-${step.id}-${Date.now()}`,
-          image: step.image,
-          cmd: step.cmd,
-          env: step.env,
-          inputs,
-          output,
-          caches,
-          mounts,
-          sources: step.sources?.map(m => ({
-            hostPath: resolve(pipelineRoot, m.host),
-            containerPath: m.container
-          })),
-          network: step.allowNetwork ? 'bridge' : 'none',
-          timeoutSec: step.timeoutSec
-        },
-        ({stream, line}) => {
-          if (stream === 'stdout') {
-            stdoutLog.write(line + '\n')
-          } else {
-            stderrLog.write(line + '\n')
+      const maxRetries = step.retries ?? 0
+      const retryDelay = step.retryDelayMs ?? 5000
+
+      let result!: Awaited<ReturnType<ContainerExecutor['run']>>
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+          result = await this.runtime.run(
+            workspace,
+            {
+              name: `pipex-${workspace.id}-${step.id}-${Date.now()}`,
+              image: step.image,
+              cmd: step.cmd,
+              env: step.env,
+              inputs,
+              output,
+              caches,
+              mounts,
+              sources: step.sources?.map(m => ({
+                hostPath: resolve(pipelineRoot, m.host),
+                containerPath: m.container
+              })),
+              network: step.allowNetwork ? 'bridge' : 'none',
+              timeoutSec: step.timeoutSec
+            },
+            ({stream, line}) => {
+              if (stream === 'stdout') {
+                stdoutLog.write(line + '\n')
+              } else {
+                stderrLog.write(line + '\n')
+              }
+
+              this.reporter.log(workspace.id, stepRef, stream, line)
+            }
+          )
+          break
+        } catch (error) {
+          if (error instanceof PipexError && error.transient && attempt < maxRetries) {
+            this.reporter.state(workspace.id, 'STEP_RETRYING', stepRef, {attempt: attempt + 1, maxRetries})
+            await setTimeout(retryDelay)
+            continue
           }
 
-          this.reporter.log(workspace.id, stepRef, stream, line)
+          throw error
         }
-      )
+      }
 
       this.reporter.result(workspace.id, stepRef, result)
 
@@ -181,7 +200,7 @@ export class PipelineRunner {
       await workspace.discardRun(runId)
       this.reporter.state(workspace.id, 'STEP_FAILED', stepRef, {exitCode: result.exitCode})
       this.reporter.state(workspace.id, 'PIPELINE_FAILED')
-      throw new Error(`Step ${step.id} failed with exit code ${result.exitCode}`)
+      throw new ContainerCrashError(step.id, result.exitCode)
     } catch (error) {
       await closeStream(stdoutLog)
       await closeStream(stderrLog)
@@ -268,7 +287,7 @@ export class PipelineRunner {
     for (const input of step.inputs) {
       const inputRunId = stepRuns.get(input.step)
       if (!inputRunId) {
-        throw new Error(`Step ${step.id}: input step '${input.step}' not found or not yet executed`)
+        throw new StepNotFoundError(step.id, input.step)
       }
 
       if (input.copyToOutput) {

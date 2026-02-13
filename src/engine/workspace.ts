@@ -1,6 +1,7 @@
 import {access, mkdir, readdir, rename, rm, symlink} from 'node:fs/promises'
 import {randomUUID} from 'node:crypto'
 import {join} from 'node:path'
+import {WorkspaceError, StagingError} from '../errors.js'
 
 /**
  * Isolated execution environment for container runs.
@@ -102,7 +103,7 @@ export class Workspace {
    */
   static async remove(workdirRoot: string, id: string): Promise<void> {
     if (id.includes('..') || id.includes('/')) {
-      throw new Error(`Invalid workspace ID: ${id}`)
+      throw new WorkspaceError('INVALID_WORKSPACE_ID', `Invalid workspace ID: ${id}`)
     }
 
     await rm(join(workdirRoot, id), {recursive: true, force: true})
@@ -175,10 +176,14 @@ export class Workspace {
    * @returns Absolute path to the created staging directory
    */
   async prepareRun(runId: string): Promise<string> {
-    const path = this.runStagingPath(runId)
-    await mkdir(path, {recursive: true})
-    await mkdir(join(path, 'artifacts'), {recursive: true})
-    return path
+    try {
+      const path = this.runStagingPath(runId)
+      await mkdir(path, {recursive: true})
+      await mkdir(join(path, 'artifacts'), {recursive: true})
+      return path
+    } catch (error) {
+      throw new StagingError(`Failed to prepare run ${runId}`, {cause: error})
+    }
   }
 
   /**
@@ -187,7 +192,11 @@ export class Workspace {
    * @param runId - Run identifier
    */
   async commitRun(runId: string): Promise<void> {
-    await rename(this.runStagingPath(runId), this.runPath(runId))
+    try {
+      await rename(this.runStagingPath(runId), this.runPath(runId))
+    } catch (error) {
+      throw new StagingError(`Failed to commit run ${runId}`, {cause: error})
+    }
   }
 
   /**
@@ -209,7 +218,11 @@ export class Workspace {
    * @param runId - Run identifier
    */
   async discardRun(runId: string): Promise<void> {
-    await rm(this.runStagingPath(runId), {recursive: true, force: true})
+    try {
+      await rm(this.runStagingPath(runId), {recursive: true, force: true})
+    } catch (error) {
+      throw new StagingError(`Failed to discard run ${runId}`, {cause: error})
+    }
   }
 
   /**
@@ -306,11 +319,11 @@ export class Workspace {
    */
   private validateRunId(id: string): void {
     if (!/^[\w-]+$/.test(id)) {
-      throw new Error(`Invalid run ID: ${id}. Must contain only alphanumeric characters, dashes, and underscores.`)
+      throw new WorkspaceError('INVALID_RUN_ID', `Invalid run ID: ${id}. Must contain only alphanumeric characters, dashes, and underscores.`)
     }
 
     if (id.includes('..')) {
-      throw new Error(`Invalid run ID: ${id}. Path traversal is not allowed.`)
+      throw new WorkspaceError('INVALID_RUN_ID', `Invalid run ID: ${id}. Path traversal is not allowed.`)
     }
   }
 
@@ -323,11 +336,11 @@ export class Workspace {
    */
   private validateCacheName(name: string): void {
     if (!/^[\w-]+$/.test(name)) {
-      throw new Error(`Invalid cache name: ${name}. Must contain only alphanumeric characters, dashes, and underscores.`)
+      throw new WorkspaceError('INVALID_CACHE_NAME', `Invalid cache name: ${name}. Must contain only alphanumeric characters, dashes, and underscores.`)
     }
 
     if (name.includes('..')) {
-      throw new Error(`Invalid cache name: ${name}. Path traversal is not allowed.`)
+      throw new WorkspaceError('INVALID_CACHE_NAME', `Invalid cache name: ${name}. Path traversal is not allowed.`)
     }
   }
 }

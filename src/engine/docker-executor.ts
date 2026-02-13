@@ -1,5 +1,6 @@
 import process from 'node:process'
 import {execa} from 'execa'
+import {DockerNotAvailableError, ImagePullError, ContainerTimeoutError} from '../errors.js'
 import type {RunContainerRequest, RunContainerResult} from './types.js'
 import {ContainerExecutor, type OnLogLine} from './executor.js'
 import type {Workspace} from './workspace.js'
@@ -27,8 +28,8 @@ export class DockerCliExecutor extends ContainerExecutor {
   async check(): Promise<void> {
     try {
       await execa('docker', ['--version'], {env: this.env})
-    } catch {
-      throw new Error('Docker CLI not found. Please install Docker.')
+    } catch (error) {
+      throw new DockerNotAvailableError({cause: error})
     }
   }
 
@@ -130,6 +131,15 @@ export class DockerCliExecutor extends ContainerExecutor {
       await Promise.all([stdoutDone, stderrDone])
       exitCode = result.exitCode ?? 0
     } catch (error_) {
+      if (error_ instanceof Error && 'timedOut' in error_ && error_.timedOut) {
+        throw new ContainerTimeoutError(request.timeoutSec ?? 0, {cause: error_})
+      }
+
+      const stderr = error_ instanceof Error && 'stderr' in error_ ? String(error_.stderr) : ''
+      if (/unable to find image|pull access denied|manifest unknown/i.test(stderr)) {
+        throw new ImagePullError(request.image, {cause: error_})
+      }
+
       exitCode = 1
       error = error_ instanceof Error ? error_.message : String(error_)
     } finally {

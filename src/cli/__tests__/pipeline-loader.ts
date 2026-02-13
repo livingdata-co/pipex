@@ -1,4 +1,5 @@
 import test from 'ava'
+import {ValidationError} from '../../errors.js'
 import {
   PipelineLoader,
   slugify,
@@ -161,23 +162,26 @@ test('parse: derives id from name via slugify', t => {
   t.is(pipeline.steps[0].id, 'premiere-etape')
 })
 
-test('parse: throws when neither id nor name on pipeline', t => {
-  t.throws(() => loader.parse(JSON.stringify({
+test('parse: throws ValidationError when neither id nor name on pipeline', t => {
+  const error = t.throws(() => loader.parse(JSON.stringify({
     steps: [{id: 's', image: 'alpine', cmd: ['echo']}]
   }), 'p.json'), {message: /at least one of "id" or "name"/})
+  t.true(error instanceof ValidationError)
 })
 
-test('parse: throws when neither id nor name on step', t => {
-  t.throws(() => loader.parse(JSON.stringify({
+test('parse: throws ValidationError when neither id nor name on step', t => {
+  const error = t.throws(() => loader.parse(JSON.stringify({
     id: 'p',
     steps: [{image: 'alpine', cmd: ['echo']}]
   }), 'p.json'), {message: /at least one of "id" or "name"/})
+  t.true(error instanceof ValidationError)
 })
 
-test('parse: throws on empty steps array', t => {
-  t.throws(() => loader.parse(JSON.stringify({
+test('parse: throws ValidationError on empty steps array', t => {
+  const error = t.throws(() => loader.parse(JSON.stringify({
     id: 'p', steps: []
   }), 'p.json'), {message: /steps must be a non-empty array/})
+  t.true(error instanceof ValidationError)
 })
 
 test('parse: throws on invalid identifier with path traversal', t => {
@@ -208,14 +212,15 @@ test('parse: throws when step has no cmd', t => {
   }), 'p.json'), {message: /cmd must be a non-empty array/})
 })
 
-test('parse: throws on duplicate step ids', t => {
-  t.throws(() => loader.parse(JSON.stringify({
+test('parse: throws ValidationError on duplicate step ids', t => {
+  const error = t.throws(() => loader.parse(JSON.stringify({
     id: 'p',
     steps: [
       {id: 's', image: 'alpine', cmd: ['echo']},
       {id: 's', image: 'alpine', cmd: ['echo']}
     ]
   }), 'p.json'), {message: /Duplicate step id/})
+  t.true(error instanceof ValidationError)
 })
 
 test('parse: validates mount host must be relative', t => {

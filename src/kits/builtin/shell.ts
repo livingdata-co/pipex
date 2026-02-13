@@ -1,3 +1,4 @@
+import {MissingParameterError} from '../../errors.js'
 import type {Kit, KitOutput} from '../index.js'
 
 export const shellKit: Kit = {
@@ -5,7 +6,7 @@ export const shellKit: Kit = {
   resolve(params) {
     const run = params.run as string | undefined
     if (!run || typeof run !== 'string') {
-      throw new Error('Kit "shell": "run" parameter is required')
+      throw new MissingParameterError('shell', 'run')
     }
 
     const packages = params.packages as string[] | undefined

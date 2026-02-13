@@ -2,6 +2,7 @@ import {readFile} from 'node:fs/promises'
 import {extname} from 'node:path'
 import {deburr} from 'lodash-es'
 import {parse as parseYaml} from 'yaml'
+import {ValidationError} from '../errors.js'
 import {getKit} from '../kits/index.js'
 import {isKitStep, type CacheSpec, type KitStepDefinition, type MountSpec, type Pipeline, type PipelineDefinition, type Step, type StepDefinition} from '../types.js'
 
@@ -15,13 +16,13 @@ export class PipelineLoader {
     const input = parsePipelineFile(content, filePath) as PipelineDefinition
 
     if (!input.id && !input.name) {
-      throw new Error('Invalid pipeline: at least one of "id" or "name" must be defined')
+      throw new ValidationError('Invalid pipeline: at least one of "id" or "name" must be defined')
     }
 
     const pipelineId = input.id ?? slugify(input.name!)
 
     if (!Array.isArray(input.steps) || input.steps.length === 0) {
-      throw new Error('Invalid pipeline: steps must be a non-empty array')
+      throw new ValidationError('Invalid pipeline: steps must be a non-empty array')
     }
 
     const steps = input.steps.map(step => this.resolveStep(step))
@@ -37,7 +38,7 @@ export class PipelineLoader {
 
   private resolveStep(step: StepDefinition): Step {
     if (!step.id && !step.name) {
-      throw new Error('Invalid step: at least one of "id" or "name" must be defined')
+      throw new ValidationError('Invalid step: at least one of "id" or "name" must be defined')
     }
 
     const id = step.id ?? slugify(step.name!)
@@ -67,7 +68,9 @@ export class PipelineLoader {
       sources: mergeMounts(kitOutput.sources, step.sources),
       timeoutSec: step.timeoutSec,
       allowFailure: step.allowFailure,
-      allowNetwork: step.allowNetwork ?? kitOutput.allowNetwork
+      allowNetwork: step.allowNetwork ?? kitOutput.allowNetwork,
+      retries: step.retries,
+      retryDelayMs: step.retryDelayMs
     }
   }
 
@@ -75,11 +78,11 @@ export class PipelineLoader {
     this.validateIdentifier(step.id, 'step id')
 
     if (!step.image || typeof step.image !== 'string') {
-      throw new Error(`Invalid step ${step.id}: image is required`)
+      throw new ValidationError(`Invalid step ${step.id}: image is required`)
     }
 
     if (!Array.isArray(step.cmd) || step.cmd.length === 0) {
-      throw new Error(`Invalid step ${step.id}: cmd must be a non-empty array`)
+      throw new ValidationError(`Invalid step ${step.id}: cmd must be a non-empty array`)
     }
 
     if (step.inputs) {
@@ -103,65 +106,65 @@ export class PipelineLoader {
 
   private validateMounts(stepId: string, mounts: unknown): void {
     if (!Array.isArray(mounts)) {
-      throw new TypeError(`Step ${stepId}: mounts must be an array`)
+      throw new ValidationError(`Step ${stepId}: mounts must be an array`)
     }
 
     for (const mount of mounts as Array<{host: string; container: string}>) {
       if (!mount.host || typeof mount.host !== 'string') {
-        throw new Error(`Step ${stepId}: mount.host is required and must be a string`)
+        throw new ValidationError(`Step ${stepId}: mount.host is required and must be a string`)
       }
 
       if (mount.host.startsWith('/')) {
-        throw new Error(`Step ${stepId}: mount.host '${mount.host}' must be a relative path`)
+        throw new ValidationError(`Step ${stepId}: mount.host '${mount.host}' must be a relative path`)
       }
 
       if (mount.host.includes('..')) {
-        throw new Error(`Step ${stepId}: mount.host '${mount.host}' must not contain '..'`)
+        throw new ValidationError(`Step ${stepId}: mount.host '${mount.host}' must not contain '..'`)
       }
 
       if (!mount.container || typeof mount.container !== 'string') {
-        throw new Error(`Step ${stepId}: mount.container is required and must be a string`)
+        throw new ValidationError(`Step ${stepId}: mount.container is required and must be a string`)
       }
 
       if (!mount.container.startsWith('/')) {
-        throw new Error(`Step ${stepId}: mount.container '${mount.container}' must be an absolute path`)
+        throw new ValidationError(`Step ${stepId}: mount.container '${mount.container}' must be an absolute path`)
       }
 
       if (mount.container.includes('..')) {
-        throw new Error(`Step ${stepId}: mount.container '${mount.container}' must not contain '..'`)
+        throw new ValidationError(`Step ${stepId}: mount.container '${mount.container}' must not contain '..'`)
       }
     }
   }
 
   private validateCaches(stepId: string, caches: unknown): void {
     if (!Array.isArray(caches)) {
-      throw new TypeError(`Step ${stepId}: caches must be an array`)
+      throw new ValidationError(`Step ${stepId}: caches must be an array`)
     }
 
     for (const cache of caches as Array<{name: string; path: string}>) {
       if (!cache.name || typeof cache.name !== 'string') {
-        throw new Error(`Step ${stepId}: cache.name is required and must be a string`)
+        throw new ValidationError(`Step ${stepId}: cache.name is required and must be a string`)
       }
 
       this.validateIdentifier(cache.name, `cache name in step ${stepId}`)
 
       if (!cache.path || typeof cache.path !== 'string') {
-        throw new Error(`Step ${stepId}: cache.path is required and must be a string`)
+        throw new ValidationError(`Step ${stepId}: cache.path is required and must be a string`)
       }
 
       if (!cache.path.startsWith('/')) {
-        throw new Error(`Step ${stepId}: cache.path '${cache.path}' must be an absolute path`)
+        throw new ValidationError(`Step ${stepId}: cache.path '${cache.path}' must be an absolute path`)
       }
     }
   }
 
   private validateIdentifier(id: string, context: string): void {
     if (!/^[\w-]+$/.test(id)) {
-      throw new Error(`Invalid ${context}: '${id}' must contain only alphanumeric characters, underscore, and hyphen`)
+      throw new ValidationError(`Invalid ${context}: '${id}' must contain only alphanumeric characters, underscore, and hyphen`)
     }
 
     if (id.includes('..')) {
-      throw new Error(`Invalid ${context}: '${id}' cannot contain '..'`)
+      throw new ValidationError(`Invalid ${context}: '${id}' cannot contain '..'`)
     }
   }
 
@@ -169,7 +172,7 @@ export class PipelineLoader {
     const seen = new Set<string>()
     for (const step of steps) {
       if (seen.has(step.id)) {
-        throw new Error(`Duplicate step id: '${step.id}'`)
+        throw new ValidationError(`Duplicate step id: '${step.id}'`)
       }
 
       seen.add(step.id)

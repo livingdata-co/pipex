@@ -1,4 +1,5 @@
 import test from 'ava'
+import {KitError, MissingParameterError} from '../../../errors.js'
 import {pythonKit} from '../python.js'
 
 test('resolve with minimal params (script only)', t => {
@@ -40,12 +41,14 @@ test('resolve sets allowNetwork to true', t => {
   t.true(result.allowNetwork)
 })
 
-test('resolve throws on unsupported packageManager', t => {
-  t.throws(() => pythonKit.resolve({script: 'app.py', packageManager: 'conda'}), {
+test('resolve throws KitError on unsupported packageManager', t => {
+  const error = t.throws(() => pythonKit.resolve({script: 'app.py', packageManager: 'conda'}), {
     message: /unsupported packageManager/
   })
+  t.true(error instanceof KitError)
 })
 
-test('resolve throws without script', t => {
-  t.throws(() => pythonKit.resolve({}), {message: /script.*required/i})
+test('resolve throws MissingParameterError without script', t => {
+  const error = t.throws(() => pythonKit.resolve({}), {message: /script.*required/i})
+  t.true(error instanceof MissingParameterError)
 })

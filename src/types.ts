@@ -56,6 +56,10 @@ export type Step = {
   allowFailure?: boolean;
   /** When true the container gets network access (default: isolated). */
   allowNetwork?: boolean;
+  /** Number of retry attempts for transient errors (default: 0). */
+  retries?: number;
+  /** Delay in milliseconds between retry attempts (default: 5000). */
+  retryDelayMs?: number;
 }
 
 /** A pipeline whose steps have all been resolved. */
@@ -92,6 +96,8 @@ export type KitStepDefinition = {
   timeoutSec?: number;
   allowFailure?: boolean;
   allowNetwork?: boolean;
+  retries?: number;
+  retryDelayMs?: number;
 }
 
 /**

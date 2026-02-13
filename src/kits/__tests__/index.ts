@@ -1,4 +1,5 @@
 import test from 'ava'
+import {KitError} from '../../errors.js'
 import {getKit} from '../index.js'
 
 test('getKit returns node kit', t => {
@@ -16,8 +17,9 @@ test('getKit returns shell kit', t => {
   t.is(kit.name, 'shell')
 })
 
-test('getKit throws on unknown kit with available list', t => {
+test('getKit throws KitError on unknown kit with available list', t => {
   const error = t.throws(() => getKit('unknown'))
+  t.true(error instanceof KitError)
   t.truthy(error?.message.includes('Unknown kit'))
   t.truthy(error?.message.includes('node'))
   t.truthy(error?.message.includes('python'))
