@@ -2,15 +2,6 @@ const {groupBy, mapValues, meanBy, size} = require('lodash')
 const fs = require('fs')
 const path = require('path')
 
-// Verify /app is read-only
-try {
-  fs.writeFileSync('/app/_write_test', 'test')
-  console.error('ERROR: /app should be read-only but write succeeded')
-  process.exit(1)
-} catch {
-  console.log('Verified: /app is read-only')
-}
-
 // Sample dataset
 const data = [
   {category: 'backend', language: 'Go', score: 92},

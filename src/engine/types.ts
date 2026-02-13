@@ -9,26 +9,26 @@ export type BindMount = {
 }
 
 /**
- * Read-only mount of a committed artifact.
- * The artifact must exist in the workspace's artifacts/ directory.
+ * Read-only mount of a committed run's artifacts.
+ * The run must exist in the workspace's runs/ directory.
  */
 export type InputMount = {
-  /** Identifier of the committed artifact to mount */
-  artifactId: string;
-  /** Path where the artifact will be mounted inside the container (e.g., /input/step1) */
+  /** Identifier of the committed run whose artifacts to mount */
+  runId: string;
+  /** Path where the artifacts will be mounted inside the container (e.g., /input/step1) */
   containerPath: string;
 }
 
 /**
  * Read-write mount for the output of an execution.
  *
- * The container writes to the staging directory during execution.
- * After successful execution, the staging directory is committed to artifacts.
- * On failure, the staging directory is discarded.
+ * The container writes to the staging run's artifacts directory during execution.
+ * After successful execution, the staging run is committed to runs/.
+ * On failure, the staging run is discarded.
  */
 export type OutputMount = {
-  /** Identifier of the artifact being created (in staging/ during execution) */
-  stagingArtifactId: string;
+  /** Identifier of the run being created (in staging/ during execution) */
+  stagingRunId: string;
   /** Path where output will be mounted inside the container (typically /output) */
   containerPath: string;
 }
@@ -37,7 +37,7 @@ export type OutputMount = {
  * Read-write mount of a persistent cache directory.
  *
  * Caches are workspace-scoped persistent directories that survive
- * across executions. Unlike artifacts (immutable outputs), caches
+ * across executions. Unlike run artifacts (immutable outputs), caches
  * are mutable and shared between steps.
  *
  * Common use cases:
@@ -64,7 +64,7 @@ export type RunContainerRequest = {
   cmd: string[];
   /** Environment variables to pass to the container */
   env?: Record<string, string>;
-  /** Input artifacts to mount as read-only volumes */
+  /** Input run artifacts to mount as read-only volumes */
   inputs: InputMount[];
   /** Output location to mount as read-write volume */
   output: OutputMount;

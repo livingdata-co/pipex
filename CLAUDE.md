@@ -4,12 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Pipex is a containerized pipeline execution engine that runs multi-step pipelines where each step executes in an isolated Docker container. It manages artifacts, caches, and dependencies between steps with fingerprint-based caching.
+Pipex is a containerized pipeline execution engine that runs multi-step pipelines where each step executes in an isolated Docker container. It manages runs (artifacts + logs + metadata), caches, and dependencies between steps with fingerprint-based caching.
 
 ## Commands
 
 ```bash
 pipex run <pipeline.yaml>                               # Run pipeline (published binary)
+pipex show <workspace>                                  # Show steps and runs in a workspace
+pipex logs <workspace> <step>                           # Show logs from last run of a step
+pipex inspect <workspace> <step>                        # Show run metadata
 pipex list                                             # List workspaces
 pipex rm <workspace>                                   # Remove workspace
 pipex clean                                            # Remove all workspaces
@@ -25,13 +28,13 @@ npm run lint:fix                                       # Auto-fix lint issues
 Two-layer design:
 
 ### Engine Layer (`src/engine/`) — Low-level container execution
-- **workspace.ts** — Manages isolated execution environments with three directory types: `staging/` (temporary write), `artifacts/` (committed immutable outputs), `caches/` (persistent read-write shared across steps). Two-phase artifact lifecycle: prepare → commit/discard.
+- **workspace.ts** — Manages isolated execution environments with three directory types: `staging/` (temporary write), `runs/` (committed immutable run outputs), `caches/` (persistent read-write shared across steps). Two-phase run lifecycle: prepareRun → commitRun/discardRun. Each run contains `artifacts/`, `stdout.log`, `stderr.log`, and `meta.json`.
 - **docker-executor.ts** — Implements `ContainerExecutor` abstract class using Docker CLI via `execa`. Uses `docker create` + `docker cp` + `docker start` lifecycle. Handles mount configuration (inputs=read-only, output=read-write, caches=read-write, host mounts=read-only, sources=copied into container layer), environment isolation (only PATH/HOME/DOCKER_* forwarded), log streaming via `subprocess.iterable()`, and container cleanup.
 - **executor.ts** — Abstract `ContainerExecutor` base class for pluggable runtimes.
 
 ### CLI Layer (`src/cli/`) — High-level orchestration
-- **pipeline-runner.ts** — Orchestrates sequential step execution. Computes SHA256 fingerprints (image + cmd + env + sorted inputs + mounts) for cache invalidation. Mounts previous step artifacts as inputs. Supports `allowFailure` and `force` (skip cache) options.
-- **state.ts** — Persists step fingerprints and artifact IDs to `state.json` per workspace. Handles cache hit detection and invalidation propagation through dependent steps.
+- **pipeline-runner.ts** — Orchestrates sequential step execution. Computes SHA256 fingerprints (image + cmd + env + sorted inputs + mounts) for cache invalidation. Each step execution produces a **run** with artifacts, captured logs (stdout.log/stderr.log), and structured metadata (meta.json). Mounts previous run artifacts as inputs. Supports `allowFailure` and `force` (skip cache) options.
+- **state.ts** — Persists step fingerprints and run IDs to `state.json` per workspace. Handles cache hit detection and invalidation propagation through dependent steps.
 - **pipeline-loader.ts** — Validates pipeline JSON configs with security checks (no path traversal, relative host mounts only, absolute container paths, alphanumeric IDs).
 - **reporter.ts** — Two implementations: `ConsoleReporter` (structured JSON via Pino) and `InteractiveReporter` (colored spinners via ora/chalk).
 - **index.ts** — CLI entry point using Commander.js.
@@ -47,7 +50,7 @@ Kit resolution happens in `PipelineLoader.resolveKitStep()`: `uses` selects the 
 ### Execution Flow
 ```
 CLI → PipelineRunner.run() → PipelineLoader.load() → Workspace.create()
-  → For each step: fingerprint check → prepare artifact → DockerCliExecutor.run() → commit/discard artifact → update state
+  → For each step: fingerprint check → prepareRun → DockerCliExecutor.run() (with log capture) → write meta.json → commitRun/discardRun → update state
 ```
 
 ## Code Style

@@ -37,10 +37,27 @@ pipex run pipeline.yaml --json
 pipex run pipeline.yaml --workdir /tmp/builds
 ```
 
+### Inspecting runs
+
+Each step execution produces a **run** containing artifacts, logs (stdout/stderr), and metadata:
+
+```bash
+# Show all steps and their last run (status, duration, date)
+pipex show my-pipeline
+
+# Show logs from the last run of a step
+pipex logs my-pipeline download
+pipex logs my-pipeline download --stream stderr
+
+# Show execution metadata (image, cmd, duration, exit code, fingerprint…)
+pipex inspect my-pipeline download
+pipex inspect my-pipeline download --json
+```
+
 ### Managing workspaces
 
 ```bash
-# List workspaces (with artifact/cache counts)
+# List workspaces (with run/cache counts)
 pipex list
 pipex ls --json
 
@@ -56,6 +73,9 @@ pipex clean
 | Command | Description |
 |---------|-------------|
 | `run <pipeline>` | Execute a pipeline |
+| `show <workspace>` | Show steps and runs in a workspace |
+| `logs <workspace> <step>` | Show stdout/stderr from last run |
+| `inspect <workspace> <step>` | Show run metadata (meta.json) |
 | `list` (alias `ls`) | List workspaces |
 | `rm <workspace...>` | Remove one or more workspaces |
 | `clean` | Remove all workspaces |
@@ -372,7 +392,7 @@ pipex rm old-workspace-id
 pipex clean
 ```
 
-### Cached step with missing artifact
+### Cached step with missing run
 
 Force re-execution:
 

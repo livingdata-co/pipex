@@ -1,6 +1,8 @@
-import {cp} from 'node:fs/promises'
-import {dirname, resolve} from 'node:path'
+import {cp, writeFile} from 'node:fs/promises'
+import {createWriteStream, type WriteStream} from 'node:fs'
+import {dirname, join, resolve} from 'node:path'
 import {Workspace, type ContainerExecutor, type InputMount, type OutputMount, type CacheMount, type BindMount} from '../engine/index.js'
+import type {Step} from '../types.js'
 import type {Reporter, StepRef} from './reporter.js'
 import type {PipelineLoader} from './pipeline-loader.js'
 import {StateManager} from './state.js'
@@ -13,27 +15,20 @@ import {StateManager} from './state.js'
  * 1. **Workspace Resolution**: Determines workspace ID from CLI flag, config, or filename
  * 2. **State Loading**: Loads cached fingerprints from state.json
  * 3. **Step Execution**: For each step:
- *    a. Computes fingerprint (image + cmd + env + input artifact IDs)
- *    b. Checks cache (fingerprint match + artifact exists)
+ *    a. Computes fingerprint (image + cmd + env + input run IDs)
+ *    b. Checks cache (fingerprint match + run exists)
  *    c. If cached: skips execution
  *    d. If not cached: resolves inputs, prepares staging, executes container
- *    e. On success: commits artifact, saves state
- *    f. On failure: discards artifact, halts pipeline (unless allowFailure)
+ *    e. On success: writes meta.json, commits run, saves state
+ *    f. On failure: discards run, halts pipeline (unless allowFailure)
  * 4. **Completion**: Reports final pipeline status
  *
- * ## Dependencies
+ * ## Runs
  *
- * Steps declare dependencies via `inputs: [{step: "stepId"}]`.
- * The runner:
- * - Mounts input artifacts as read-only volumes
- * - Optionally copies inputs to output staging (if `copyToOutput: true`)
- * - Tracks execution order to resolve step names to artifact IDs
- *
- * ## Caching
- *
- * Cache invalidation is automatic:
- * - Changing a step's configuration re-runs it
- * - Re-running a step invalidates all dependent steps
+ * Each step execution produces a **run** containing:
+ * - `artifacts/` — files produced by the step
+ * - `stdout.log` / `stderr.log` — captured container logs
+ * - `meta.json` — structured execution metadata
  */
 export class PipelineRunner {
   constructor(
@@ -48,7 +43,6 @@ export class PipelineRunner {
     const config = await this.loader.load(pipelineFilePath)
     const pipelineRoot = dirname(resolve(pipelineFilePath))
 
-    // Workspace ID priority: CLI arg > pipeline id
     const workspaceId = workspaceName ?? config.id
 
     let workspace: Workspace
@@ -63,14 +57,14 @@ export class PipelineRunner {
 
     const state = new StateManager(workspace.root)
     await state.load()
-    const stepArtifacts = new Map<string, string>()
+    const stepRuns = new Map<string, string>()
 
     this.reporter.state(workspace.id, 'PIPELINE_START', undefined, {pipelineName: config.name ?? config.id})
 
     for (const step of config.steps) {
       const stepRef: StepRef = {id: step.id, displayName: step.name ?? step.id}
-      const inputArtifactIds = step.inputs
-        ?.map(i => stepArtifacts.get(i.step))
+      const inputRunIds = step.inputs
+        ?.map(i => stepRuns.get(i.step))
         .filter((id): id is string => id !== undefined)
       const resolvedMounts = step.mounts?.map(m => ({
         hostPath: resolve(pipelineRoot, m.host),
@@ -80,31 +74,49 @@ export class PipelineRunner {
         image: step.image,
         cmd: step.cmd,
         env: step.env,
-        inputArtifactIds,
+        inputRunIds,
         mounts: resolvedMounts
       })
 
       const skipCache = force === true || (Array.isArray(force) && force.includes(step.id))
-      if (!skipCache && await this.tryUseCache({workspace, state, step, stepRef, currentFingerprint, stepArtifacts})) {
+      if (!skipCache && await this.tryUseCache({workspace, state, step, stepRef, currentFingerprint, stepRuns})) {
         continue
       }
 
       this.reporter.state(workspace.id, 'STEP_STARTING', stepRef)
+      await this.executeStep({workspace, state, step, stepRef, stepRuns, currentFingerprint, resolvedMounts, pipelineRoot})
+    }
 
-      const artifactId = workspace.generateArtifactId()
-      const stagingPath = await workspace.prepareArtifact(artifactId)
+    this.reporter.state(workspace.id, 'PIPELINE_FINISHED')
+  }
 
-      await this.prepareStagingWithInputs(workspace, step, stagingPath, stepArtifacts)
+  private async executeStep({workspace, state, step, stepRef, stepRuns, currentFingerprint, resolvedMounts, pipelineRoot}: {
+    workspace: Workspace;
+    state: StateManager;
+    step: Step;
+    stepRef: StepRef;
+    stepRuns: Map<string, string>;
+    currentFingerprint: string;
+    resolvedMounts?: Array<{hostPath: string; containerPath: string}>;
+    pipelineRoot: string;
+  }): Promise<void> {
+    const runId = workspace.generateRunId()
+    const stagingPath = await workspace.prepareRun(runId)
 
-      // Prepare caches
-      if (step.caches) {
-        for (const cache of step.caches) {
-          await workspace.prepareCache(cache.name)
-        }
+    await this.prepareStagingWithInputs(workspace, step, workspace.runStagingArtifactsPath(runId), stepRuns)
+
+    if (step.caches) {
+      for (const cache of step.caches) {
+        await workspace.prepareCache(cache.name)
       }
+    }
 
-      const {inputs, output, caches, mounts} = this.buildMounts(step, artifactId, stepArtifacts, pipelineRoot)
+    const {inputs, output, caches, mounts} = this.buildMounts(step, runId, stepRuns, pipelineRoot)
 
+    const stdoutLog = createWriteStream(join(stagingPath, 'stdout.log'))
+    const stderrLog = createWriteStream(join(stagingPath, 'stderr.log'))
+
+    try {
       const result = await this.runtime.run(
         workspace,
         {
@@ -124,30 +136,76 @@ export class PipelineRunner {
           timeoutSec: step.timeoutSec
         },
         ({stream, line}) => {
+          if (stream === 'stdout') {
+            stdoutLog.write(line + '\n')
+          } else {
+            stderrLog.write(line + '\n')
+          }
+
           this.reporter.log(workspace.id, stepRef, stream, line)
         }
       )
 
       this.reporter.result(workspace.id, stepRef, result)
 
-      if (result.exitCode === 0 || step.allowFailure) {
-        await workspace.commitArtifact(artifactId)
-        await workspace.linkArtifact(step.id, artifactId)
-        stepArtifacts.set(step.id, artifactId)
+      await closeStream(stdoutLog)
+      await closeStream(stderrLog)
 
-        state.setStep(step.id, artifactId, currentFingerprint)
+      await this.writeRunMeta(stagingPath, {runId, step, stepRuns, resolvedMounts, currentFingerprint, result})
+
+      if (result.exitCode === 0 || step.allowFailure) {
+        await workspace.commitRun(runId)
+        await workspace.linkRun(step.id, runId)
+        stepRuns.set(step.id, runId)
+
+        state.setStep(step.id, runId, currentFingerprint)
         await state.save()
 
-        this.reporter.state(workspace.id, 'STEP_FINISHED', stepRef, {artifactId})
+        this.reporter.state(workspace.id, 'STEP_FINISHED', stepRef, {runId})
       } else {
-        await workspace.discardArtifact(artifactId)
+        await workspace.discardRun(runId)
         this.reporter.state(workspace.id, 'STEP_FAILED', stepRef, {exitCode: result.exitCode})
         this.reporter.state(workspace.id, 'PIPELINE_FAILED')
         throw new Error(`Step ${step.id} failed with exit code ${result.exitCode}`)
       }
+    } catch (error) {
+      await closeStream(stdoutLog)
+      await closeStream(stderrLog)
+      throw error
     }
+  }
 
-    this.reporter.state(workspace.id, 'PIPELINE_FINISHED')
+  private async writeRunMeta(stagingPath: string, {runId, step, stepRuns, resolvedMounts, currentFingerprint, result}: {
+    runId: string;
+    step: Step;
+    stepRuns: Map<string, string>;
+    resolvedMounts?: Array<{hostPath: string; containerPath: string}>;
+    currentFingerprint: string;
+    result: {exitCode: number; startedAt: Date; finishedAt: Date};
+  }): Promise<void> {
+    const meta = {
+      runId,
+      stepId: step.id,
+      stepName: step.name,
+      startedAt: result.startedAt.toISOString(),
+      finishedAt: result.finishedAt.toISOString(),
+      durationMs: result.finishedAt.getTime() - result.startedAt.getTime(),
+      exitCode: result.exitCode,
+      image: step.image,
+      cmd: step.cmd,
+      env: step.env,
+      inputs: step.inputs?.map(i => ({
+        step: i.step,
+        runId: stepRuns.get(i.step),
+        mountedAs: `/input/${i.step}`
+      })),
+      mounts: resolvedMounts,
+      caches: step.caches?.map(c => c.name),
+      allowNetwork: step.allowNetwork ?? false,
+      fingerprint: currentFingerprint,
+      status: result.exitCode === 0 ? 'success' : 'failure'
+    }
+    await writeFile(join(stagingPath, 'meta.json'), JSON.stringify(meta, null, 2), 'utf8')
   }
 
   private async tryUseCache({
@@ -156,27 +214,27 @@ export class PipelineRunner {
     step,
     stepRef,
     currentFingerprint,
-    stepArtifacts
+    stepRuns
   }: {
     workspace: Workspace;
     state: StateManager;
     step: {id: string; name?: string};
     stepRef: StepRef;
     currentFingerprint: string;
-    stepArtifacts: Map<string, string>;
+    stepRuns: Map<string, string>;
   }): Promise<boolean> {
     const cached = state.getStep(step.id)
     if (cached?.fingerprint === currentFingerprint) {
       try {
-        const artifacts = await workspace.listArtifacts()
-        if (artifacts.includes(cached.artifactId)) {
-          stepArtifacts.set(step.id, cached.artifactId)
-          await workspace.linkArtifact(step.id, cached.artifactId)
-          this.reporter.state(workspace.id, 'STEP_SKIPPED', stepRef, {artifactId: cached.artifactId, reason: 'cached'})
+        const runs = await workspace.listRuns()
+        if (runs.includes(cached.runId)) {
+          stepRuns.set(step.id, cached.runId)
+          await workspace.linkRun(step.id, cached.runId)
+          this.reporter.state(workspace.id, 'STEP_SKIPPED', stepRef, {runId: cached.runId, reason: 'cached'})
           return true
         }
       } catch {
-        // Artifact missing, proceed with execution
+        // Run missing, proceed with execution
       }
     }
 
@@ -186,39 +244,39 @@ export class PipelineRunner {
   private async prepareStagingWithInputs(
     workspace: Workspace,
     step: {id: string; inputs?: Array<{step: string; copyToOutput?: boolean}>},
-    stagingPath: string,
-    stepArtifacts: Map<string, string>
+    stagingArtifactsPath: string,
+    stepRuns: Map<string, string>
   ): Promise<void> {
     if (!step.inputs) {
       return
     }
 
     for (const input of step.inputs) {
-      const inputArtifactId = stepArtifacts.get(input.step)
-      if (!inputArtifactId) {
+      const inputRunId = stepRuns.get(input.step)
+      if (!inputRunId) {
         throw new Error(`Step ${step.id}: input step '${input.step}' not found or not yet executed`)
       }
 
       if (input.copyToOutput) {
-        await cp(workspace.artifactPath(inputArtifactId), stagingPath, {recursive: true})
+        await cp(workspace.runArtifactsPath(inputRunId), stagingArtifactsPath, {recursive: true})
       }
     }
   }
 
   private buildMounts(
     step: {inputs?: Array<{step: string}>; outputPath?: string; caches?: Array<{name: string; path: string}>; mounts?: Array<{host: string; container: string}>},
-    outputArtifactId: string,
-    stepArtifacts: Map<string, string>,
+    outputRunId: string,
+    stepRuns: Map<string, string>,
     pipelineRoot: string
   ): {inputs: InputMount[]; output: OutputMount; caches?: CacheMount[]; mounts?: BindMount[]} {
     const inputs: InputMount[] = []
 
     if (step.inputs) {
       for (const input of step.inputs) {
-        const inputArtifactId = stepArtifacts.get(input.step)
-        if (inputArtifactId) {
+        const inputRunId = stepRuns.get(input.step)
+        if (inputRunId) {
           inputs.push({
-            artifactId: inputArtifactId,
+            runId: inputRunId,
             containerPath: `/input/${input.step}`
           })
         }
@@ -226,11 +284,10 @@ export class PipelineRunner {
     }
 
     const output: OutputMount = {
-      stagingArtifactId: outputArtifactId,
+      stagingRunId: outputRunId,
       containerPath: step.outputPath ?? '/output'
     }
 
-    // Build cache mounts
     let caches: CacheMount[] | undefined
     if (step.caches) {
       caches = step.caches.map(c => ({
@@ -249,4 +306,17 @@ export class PipelineRunner {
 
     return {inputs, output, caches, mounts}
   }
+}
+
+async function closeStream(stream: WriteStream): Promise<void> {
+  if (stream.destroyed) {
+    return
+  }
+
+  return new Promise((resolve, reject) => {
+    stream.end(() => {
+      resolve()
+    })
+    stream.on('error', reject)
+  })
 }

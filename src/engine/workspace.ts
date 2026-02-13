@@ -7,18 +7,22 @@ import {join} from 'node:path'
  *
  * A workspace provides:
  * - **staging/**: Temporary write location during execution
- * - **artifacts/**: Committed outputs (immutable, read-only)
+ * - **runs/**: Committed run outputs (immutable, read-only)
  * - **caches/**: Persistent read-write caches (shared across steps)
  * - **state.json**: Managed by orchestration layer (e.g., CLI) for caching
  *
- * ## Artifact Lifecycle
+ * ## Run Lifecycle
  *
- * 1. `prepareArtifact()` creates `staging/{artifactId}/`
- * 2. Container writes to `staging/{artifactId}/` (mounted as `/output`)
- * 3. Success: `commitArtifact()` atomically moves to `artifacts/{artifactId}/`
- *    OR Failure: `discardArtifact()` deletes `staging/{artifactId}/`
+ * Each step execution produces a **run**, a structured directory containing
+ * artifacts (files produced by the step), logs (stdout/stderr), and metadata.
  *
- * Artifacts are immutable once committed.
+ * 1. `prepareRun()` creates `staging/{runId}/` with `artifacts/` subdirectory
+ * 2. Container writes to `staging/{runId}/artifacts/` (mounted as `/output`)
+ * 3. Orchestration layer writes logs and metadata to `staging/{runId}/`
+ * 4. Success: `commitRun()` atomically moves to `runs/{runId}/`
+ *    OR Failure: `discardRun()` deletes `staging/{runId}/`
+ *
+ * Runs are immutable once committed.
  *
  * ## Cache Lifecycle
  *
@@ -31,12 +35,12 @@ import {join} from 'node:path'
  * @example
  * ```typescript
  * const ws = await Workspace.create('/tmp/workdir', 'my-workspace')
- * const artifactId = ws.generateArtifactId()
- * await ws.prepareArtifact(artifactId)
+ * const runId = ws.generateRunId()
+ * await ws.prepareRun(runId)
  * await ws.prepareCache('pnpm-store')
  * // ... container execution ...
- * await ws.commitArtifact(artifactId) // On success
- * // OR await ws.discardArtifact(artifactId) // On failure
+ * await ws.commitRun(runId) // On success
+ * // OR await ws.discardRun(runId) // On failure
  * ```
  */
 export class Workspace {
@@ -49,7 +53,7 @@ export class Workspace {
   }
 
   /**
-   * Creates a new workspace with staging, artifacts, and caches directories.
+   * Creates a new workspace with staging, runs, and caches directories.
    * @param workdirRoot - Root directory for all workspaces
    * @param id - Optional workspace ID (auto-generated if omitted)
    * @returns Newly created workspace
@@ -58,7 +62,7 @@ export class Workspace {
     const workspaceId = id ?? Workspace.generateWorkspaceId()
     const root = join(workdirRoot, workspaceId)
     await mkdir(join(root, 'staging'), {recursive: true})
-    await mkdir(join(root, 'artifacts'), {recursive: true})
+    await mkdir(join(root, 'runs'), {recursive: true})
     await mkdir(join(root, 'caches'), {recursive: true})
     return new Workspace(workspaceId, root)
   }
@@ -119,82 +123,98 @@ export class Workspace {
   ) {}
 
   /**
-   * Generates a unique artifact identifier.
-   * @returns Artifact ID in format: `{timestamp}-{uuid-prefix}`
+   * Generates a unique run identifier.
+   * @returns Run ID in format: `{timestamp}-{uuid-prefix}`
    */
-  generateArtifactId(): string {
+  generateRunId(): string {
     return Workspace.generateId()
   }
 
   /**
-   * Returns the staging directory path for an artifact.
-   * Staging is used for temporary writes during execution.
-   * @param artifactId - Artifact identifier
+   * Returns the staging directory path for a run.
+   * @param runId - Run identifier
    * @returns Absolute path to staging directory
-   * @throws If artifact ID is invalid
    */
-  stagingPath(artifactId: string): string {
-    this.validateArtifactId(artifactId)
-    return join(this.root, 'staging', artifactId)
+  runStagingPath(runId: string): string {
+    this.validateRunId(runId)
+    return join(this.root, 'staging', runId)
   }
 
   /**
-   * Returns the committed artifact directory path.
-   * Artifacts are immutable once committed.
-   * @param artifactId - Artifact identifier
-   * @returns Absolute path to artifact directory
-   * @throws If artifact ID is invalid
+   * Returns the staging artifacts directory path for a run.
+   * @param runId - Run identifier
+   * @returns Absolute path to staging artifacts directory
    */
-  artifactPath(artifactId: string): string {
-    this.validateArtifactId(artifactId)
-    return join(this.root, 'artifacts', artifactId)
+  runStagingArtifactsPath(runId: string): string {
+    return join(this.runStagingPath(runId), 'artifacts')
   }
 
   /**
-   * Prepares a staging directory for a new artifact.
-   * @param artifactId - Artifact identifier
+   * Returns the committed run directory path.
+   * @param runId - Run identifier
+   * @returns Absolute path to run directory
+   */
+  runPath(runId: string): string {
+    this.validateRunId(runId)
+    return join(this.root, 'runs', runId)
+  }
+
+  /**
+   * Returns the artifacts directory path within a committed run.
+   * @param runId - Run identifier
+   * @returns Absolute path to run artifacts directory
+   */
+  runArtifactsPath(runId: string): string {
+    return join(this.runPath(runId), 'artifacts')
+  }
+
+  /**
+   * Prepares a staging directory for a new run.
+   * Creates both the run directory and its artifacts subdirectory.
+   * @param runId - Run identifier
    * @returns Absolute path to the created staging directory
    */
-  async prepareArtifact(artifactId: string): Promise<string> {
-    const path = this.stagingPath(artifactId)
+  async prepareRun(runId: string): Promise<string> {
+    const path = this.runStagingPath(runId)
     await mkdir(path, {recursive: true})
+    await mkdir(join(path, 'artifacts'), {recursive: true})
     return path
   }
 
   /**
-   * Commits a staging artifact to the artifacts directory.
+   * Commits a staging run to the runs directory.
    * Uses atomic rename operation for consistency.
-   * @param artifactId - Artifact identifier
+   * @param runId - Run identifier
    */
-  async commitArtifact(artifactId: string): Promise<void> {
-    await rename(this.stagingPath(artifactId), this.artifactPath(artifactId))
+  async commitRun(runId: string): Promise<void> {
+    await rename(this.runStagingPath(runId), this.runPath(runId))
   }
 
   /**
-   * Creates a symlink from `step-artifacts/{stepId}` to the committed artifact.
+   * Creates a symlink from `step-runs/{stepId}` to the committed run.
    * Replaces any existing symlink for the same step.
    * @param stepId - Step identifier
-   * @param artifactId - Committed artifact identifier
+   * @param runId - Committed run identifier
    */
-  async linkArtifact(stepId: string, artifactId: string): Promise<void> {
-    const dir = join(this.root, 'step-artifacts')
+  async linkRun(stepId: string, runId: string): Promise<void> {
+    const dir = join(this.root, 'step-runs')
     await mkdir(dir, {recursive: true})
     const linkPath = join(dir, stepId)
     await rm(linkPath, {force: true})
-    await symlink(join('..', 'artifacts', artifactId), linkPath)
+    await symlink(join('..', 'runs', runId), linkPath)
   }
 
   /**
-   * Discards a staging artifact (on execution failure).
-   * @param artifactId - Artifact identifier
+   * Discards a staging run (on execution failure).
+   * @param runId - Run identifier
    */
-  async discardArtifact(artifactId: string): Promise<void> {
-    await rm(this.stagingPath(artifactId), {recursive: true, force: true})
+  async discardRun(runId: string): Promise<void> {
+    await rm(this.runStagingPath(runId), {recursive: true, force: true})
   }
 
   /**
    * Removes all staging directories.
-   * Should be called on workspace initialization to clean up incomplete artifacts.
+   * Should be called on workspace initialization to clean up incomplete runs.
    */
   async cleanupStaging(): Promise<void> {
     const stagingDir = join(this.root, 'staging')
@@ -211,12 +231,12 @@ export class Workspace {
   }
 
   /**
-   * Lists all committed artifact IDs in this workspace.
-   * @returns Array of artifact IDs (directory names in artifacts/)
+   * Lists all committed run IDs in this workspace.
+   * @returns Array of run IDs (directory names in runs/)
    */
-  async listArtifacts(): Promise<string[]> {
+  async listRuns(): Promise<string[]> {
     try {
-      const entries = await readdir(join(this.root, 'artifacts'), {withFileTypes: true})
+      const entries = await readdir(join(this.root, 'runs'), {withFileTypes: true})
       return entries.filter(e => e.isDirectory()).map(e => e.name)
     } catch {
       return []
@@ -261,24 +281,24 @@ export class Workspace {
   }
 
   /**
-   * Validates an artifact ID to prevent path traversal attacks.
-   * @param id - Artifact identifier to validate
-   * @throws If the artifact ID contains invalid characters or path traversal attempts
+   * Validates a run ID to prevent path traversal attacks.
+   * @param id - Run identifier to validate
+   * @throws If the run ID contains invalid characters or path traversal attempts
    * @internal
    */
-  private validateArtifactId(id: string): void {
+  private validateRunId(id: string): void {
     if (!/^[\w-]+$/.test(id)) {
-      throw new Error(`Invalid artifact ID: ${id}. Must contain only alphanumeric characters, dashes, and underscores.`)
+      throw new Error(`Invalid run ID: ${id}. Must contain only alphanumeric characters, dashes, and underscores.`)
     }
 
     if (id.includes('..')) {
-      throw new Error(`Invalid artifact ID: ${id}. Path traversal is not allowed.`)
+      throw new Error(`Invalid run ID: ${id}. Path traversal is not allowed.`)
     }
   }
 
   /**
    * Validates a cache name to prevent path traversal attacks.
-   * Same rules as artifact IDs: alphanumeric, dashes, underscores only.
+   * Same rules as run IDs: alphanumeric, dashes, underscores only.
    * @param name - Cache name to validate
    * @throws If the cache name contains invalid characters or path traversal attempts
    * @internal

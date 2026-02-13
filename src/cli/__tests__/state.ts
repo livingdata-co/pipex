@@ -18,9 +18,9 @@ test('fingerprint sorts env keys', t => {
   t.is(a, b)
 })
 
-test('fingerprint sorts inputArtifactIds', t => {
-  const a = StateManager.fingerprint({...base, inputArtifactIds: ['x', 'y']})
-  const b = StateManager.fingerprint({...base, inputArtifactIds: ['y', 'x']})
+test('fingerprint sorts inputRunIds', t => {
+  const a = StateManager.fingerprint({...base, inputRunIds: ['x', 'y']})
+  const b = StateManager.fingerprint({...base, inputRunIds: ['y', 'x']})
   t.is(a, b)
 })
 

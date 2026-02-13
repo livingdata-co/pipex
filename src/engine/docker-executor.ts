@@ -49,9 +49,9 @@ export class DockerCliExecutor extends ContainerExecutor {
       }
     }
 
-    // Mount inputs (committed artifacts, read-only)
+    // Mount inputs (committed run artifacts, read-only)
     for (const input of request.inputs) {
-      const hostPath = workspace.artifactPath(input.artifactId)
+      const hostPath = workspace.runArtifactsPath(input.runId)
       args.push('-v', `${hostPath}:${input.containerPath}:ro`)
     }
 
@@ -70,8 +70,8 @@ export class DockerCliExecutor extends ContainerExecutor {
       }
     }
 
-    // Mount output (staging artifact, read-write)
-    const outputHostPath = workspace.stagingPath(request.output.stagingArtifactId)
+    // Mount output (staging run artifacts, read-write)
+    const outputHostPath = workspace.runStagingArtifactsPath(request.output.stagingRunId)
     args.push('-v', `${outputHostPath}:${request.output.containerPath}:rw`, request.image, ...request.cmd)
 
     let exitCode = 0

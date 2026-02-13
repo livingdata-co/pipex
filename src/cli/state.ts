@@ -6,8 +6,8 @@ import {createHash} from 'node:crypto'
  * Cached execution state for a single step.
  */
 export type StepState = {
-  /** Artifact ID produced by the step */
-  artifactId: string;
+  /** Run ID produced by the step */
+  runId: string;
   /** SHA256 fingerprint of step configuration (image + cmd + env + inputs) */
   fingerprint: string;
 }
@@ -25,31 +25,31 @@ export type PipelineState = {
  * Manages caching state for pipeline execution.
  *
  * The StateManager computes fingerprints for steps and tracks which
- * artifact was produced by each step. This enables cache hits when
+ * run was produced by each step. This enables cache hits when
  * a step's configuration hasn't changed.
  *
  * ## Fingerprint Algorithm
  *
  * A step fingerprint is computed as:
  * ```
- * SHA256(image + JSON(cmd) + JSON(sorted env) + JSON(sorted inputArtifactIds))
+ * SHA256(image + JSON(cmd) + JSON(sorted env) + JSON(sorted inputRunIds))
  * ```
  *
  * A step is re-executed when:
  * - The fingerprint changes (image, cmd, env, or inputs modified)
- * - The artifact no longer exists (manually deleted)
+ * - The run no longer exists (manually deleted)
  *
  * ## Cache Propagation
  *
  * Changes propagate through dependencies. If step A is modified,
- * all steps depending on A are invalidated automatically (via inputArtifactIds).
+ * all steps depending on A are invalidated automatically (via inputRunIds).
  */
 export class StateManager {
   static fingerprint(config: {
     image: string;
     cmd: string[];
     env?: Record<string, string>;
-    inputArtifactIds?: string[];
+    inputRunIds?: string[];
     mounts?: Array<{hostPath: string; containerPath: string}>;
   }): string {
     const hash = createHash('sha256')
@@ -59,8 +59,8 @@ export class StateManager {
       hash.update(JSON.stringify(Object.entries(config.env).sort((a, b) => a[0].localeCompare(b[0]))))
     }
 
-    if (config.inputArtifactIds) {
-      hash.update(JSON.stringify([...config.inputArtifactIds].sort((a, b) => a.localeCompare(b))))
+    if (config.inputRunIds) {
+      hash.update(JSON.stringify([...config.inputRunIds].sort((a, b) => a.localeCompare(b))))
     }
 
     if (config.mounts && config.mounts.length > 0) {
@@ -112,12 +112,20 @@ export class StateManager {
   }
 
   /**
+   * Lists all steps with their run IDs (in insertion order).
+   * @returns Array of {stepId, runId} entries
+   */
+  listSteps(): Array<{stepId: string; runId: string}> {
+    return Object.entries(this.state.steps).map(([stepId, {runId}]) => ({stepId, runId}))
+  }
+
+  /**
    * Updates cached state for a step.
    * @param stepId - Step identifier
-   * @param artifactId - Artifact produced by the step
+   * @param runId - Run produced by the step
    * @param fingerprint - Step configuration fingerprint
    */
-  setStep(stepId: string, artifactId: string, fingerprint: string): void {
-    this.state.steps[stepId] = {artifactId, fingerprint}
+  setStep(stepId: string, runId: string, fingerprint: string): void {
+    this.state.steps[stepId] = {runId, fingerprint}
   }
 }

@@ -3,15 +3,6 @@ import os
 import yaml
 from datetime import datetime, timezone
 
-# Verify /app is read-only
-try:
-    with open("/app/_write_test", "w") as f:
-        f.write("test")
-    print("ERROR: /app should be read-only but write succeeded")
-    raise SystemExit(1)
-except OSError:
-    print("Verified: /app is read-only")
-
 # Read input from previous step
 input_path = "/input/python-analyze/enriched.json"
 with open(input_path) as f:

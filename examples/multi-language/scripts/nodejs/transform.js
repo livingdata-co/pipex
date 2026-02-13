@@ -2,15 +2,6 @@ const fs = require('fs')
 const path = require('path')
 const {sortBy, flatMap} = require('lodash')
 
-// Verify /app is read-only
-try {
-  fs.writeFileSync('/app/_write_test', 'test')
-  console.error('ERROR: /app should be read-only but write succeeded')
-  process.exit(1)
-} catch {
-  console.log('Verified: /app is read-only')
-}
-
 // Read input from previous step
 const inputPath = path.join('/input/node-analyze', 'analysis.json')
 const analysis = JSON.parse(fs.readFileSync(inputPath, 'utf8'))
