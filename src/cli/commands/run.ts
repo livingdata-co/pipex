@@ -1,0 +1,43 @@
+import {resolve} from 'node:path'
+import type {Command} from 'commander'
+import {DockerCliExecutor} from '../../engine/docker-executor.js'
+import {PipelineLoader} from '../pipeline-loader.js'
+import {PipelineRunner} from '../pipeline-runner.js'
+import {ConsoleReporter, InteractiveReporter} from '../reporter.js'
+import {getGlobalOptions} from '../utils.js'
+
+export function registerRunCommand(program: Command): void {
+  program
+    .command('run')
+    .description('Execute a pipeline')
+    .argument('<pipeline>', 'Pipeline file to execute (JSON or YAML)')
+    .option('-w, --workspace <name>', 'Workspace name (for caching)')
+    .option('-f, --force [steps]', 'Skip cache for all steps, or a comma-separated list (e.g. --force step1,step2)')
+    .option('--dry-run', 'Validate pipeline and show what would run without executing')
+    .option('--verbose', 'Stream container logs in real-time (interactive mode)')
+    .action(async (pipelineFile: string, options: {workspace?: string; force?: string | boolean; dryRun?: boolean; verbose?: boolean}, cmd: Command) => {
+      const {workdir, json} = getGlobalOptions(cmd)
+      const workdirRoot = resolve(workdir)
+      const loader = new PipelineLoader()
+      const runtime = new DockerCliExecutor()
+
+      const reporter = json ? new ConsoleReporter() : new InteractiveReporter({verbose: options.verbose})
+      const runner = new PipelineRunner(loader, runtime, reporter, workdirRoot)
+
+      try {
+        const force = options.force === true
+          ? true
+          : (typeof options.force === 'string' ? options.force.split(',') : undefined)
+        await runner.run(pipelineFile, {workspace: options.workspace, force, dryRun: options.dryRun})
+        if (json) {
+          console.log('Pipeline completed')
+        }
+      } catch (error: unknown) {
+        if (json) {
+          console.error('Pipeline failed:', error instanceof Error ? error.message : error)
+        }
+
+        throw error
+      }
+    })
+}

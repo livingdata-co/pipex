@@ -1,5 +1,15 @@
 import {readdir, stat} from 'node:fs/promises'
 import {join} from 'node:path'
+import type {Command} from 'commander'
+
+export type GlobalOptions = {
+  workdir: string;
+  json?: boolean;
+}
+
+export function getGlobalOptions(cmd: Command): GlobalOptions {
+  return cmd.optsWithGlobals<GlobalOptions>()
+}
 
 export async function dirSize(dirPath: string): Promise<number> {
   let total = 0
