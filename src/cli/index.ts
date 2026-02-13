@@ -11,6 +11,9 @@ import {registerPruneCommand} from './commands/prune.js'
 import {registerListCommand} from './commands/list.js'
 import {registerRmCommand} from './commands/rm.js'
 import {registerCleanCommand} from './commands/clean.js'
+import {registerExecCommand} from './commands/exec.js'
+import {registerCatCommand} from './commands/cat.js'
+import {registerRmStepCommand} from './commands/rm-step.js'
 
 async function main() {
   const program = new Command()
@@ -31,6 +34,9 @@ async function main() {
   registerListCommand(program)
   registerRmCommand(program)
   registerCleanCommand(program)
+  registerExecCommand(program)
+  registerCatCommand(program)
+  registerRmStepCommand(program)
 
   await program.parseAsync()
 }

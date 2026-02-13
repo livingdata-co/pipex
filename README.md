@@ -37,6 +37,38 @@ pipex run pipeline.yaml --json
 pipex run pipeline.yaml --workdir /tmp/builds
 ```
 
+### Interactive step execution
+
+Execute individual steps without a full pipeline file — useful for iterative, exploratory, or agent-driven workflows:
+
+```bash
+# Create a step file
+cat > step.yaml <<'EOF'
+uses: shell
+with:
+  run: "echo hello > /output/greeting.txt"
+EOF
+
+# Execute a single step in a workspace
+pipex exec my-workspace -f step.yaml --step greet
+
+# Read artifact content
+pipex cat my-workspace greet                    # list artifacts
+pipex cat my-workspace greet greeting.txt       # read a file
+
+# Ephemeral mode: stream stdout, don't commit run
+pipex exec my-workspace -f step.yaml --step greet --ephemeral
+
+# Chain steps via --input
+pipex exec my-workspace -f process.yaml --step process --input greet
+
+# Aliased inputs (mount under /input/data instead of /input/greet)
+pipex exec my-workspace -f process.yaml --step process --input data=greet
+
+# Remove a step's run and state entry
+pipex rm-step my-workspace greet
+```
+
 ### Inspecting runs
 
 Each step execution produces a **run** containing artifacts, logs (stdout/stderr), and metadata:
@@ -79,6 +111,8 @@ pipex clean
 | Command | Description |
 |---------|-------------|
 | `run <pipeline>` | Execute a pipeline |
+| `exec <workspace> -f <step-file>` | Execute a single step in a workspace |
+| `cat <workspace> <step> [path]` | Read or list artifact content from a step's latest run |
 | `show <workspace>` | Show steps and runs in a workspace (with artifact sizes) |
 | `logs <workspace> <step>` | Show stdout/stderr from last run |
 | `inspect <workspace> <step>` | Show run metadata (meta.json) |
@@ -86,6 +120,7 @@ pipex clean
 | `prune <workspace>` | Remove old runs not referenced by current state |
 | `list` (alias `ls`) | List workspaces (with disk sizes) |
 | `rm <workspace...>` | Remove one or more workspaces |
+| `rm-step <workspace> <step>` | Remove a step's run and state entry |
 | `clean` | Remove all workspaces |
 
 ### Global Options
@@ -103,6 +138,17 @@ pipex clean
 | `--force [steps]` | `-f` | Skip cache for all steps, or a comma-separated list |
 | `--dry-run` | | Validate pipeline, compute fingerprints, show what would run without executing |
 | `--verbose` | | Stream container logs in real-time (interactive mode) |
+
+### Exec Options
+
+| Option | Alias | Description |
+|--------|-------|-------------|
+| `--file <path>` | `-f` | Step definition file (YAML or JSON, required) |
+| `--step <id>` | | Step ID (overrides file's id/name) |
+| `--input <specs...>` | | Input steps (e.g. `extract` or `data=extract`) |
+| `--ephemeral` | | Stream stdout to terminal and discard the run |
+| `--force` | | Skip cache check |
+| `--verbose` | | Stream container logs in real-time |
 
 ## Pipeline Format
 

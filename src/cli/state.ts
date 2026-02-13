@@ -135,4 +135,13 @@ export class StateManager {
   setStep(stepId: string, runId: string, fingerprint: string): void {
     this.state.steps[stepId] = {runId, fingerprint}
   }
+
+  /**
+   * Removes a step's cached state.
+   * @param stepId - Step identifier
+   */
+  removeStep(stepId: string): void {
+    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+    delete this.state.steps[stepId]
+  }
 }
