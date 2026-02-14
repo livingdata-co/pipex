@@ -3,7 +3,8 @@ import type {Command} from 'commander'
 import {DockerCliExecutor} from '../../engine/docker-executor.js'
 import {PipelineLoader} from '../pipeline-loader.js'
 import {PipelineRunner} from '../pipeline-runner.js'
-import {ConsoleReporter, InteractiveReporter} from '../reporter.js'
+import {ConsoleReporter} from '../reporter.js'
+import {InteractiveReporter} from '../interactive-reporter.js'
 import {getGlobalOptions} from '../utils.js'
 
 export function registerRunCommand(program: Command): void {

@@ -56,12 +56,19 @@ export class PipelineRunner {
     const stepRuns = new Map<string, string>()
     let totalArtifactSize = 0
 
-    this.reporter.emit({event: 'PIPELINE_START', workspaceId: workspace.id, pipelineName: config.name ?? config.id})
-
     // Build DAG and determine execution scope
     const graph = buildGraph(config.steps)
     const targets = target ?? leafNodes(graph)
     const activeSteps = subgraph(graph, targets)
+
+    this.reporter.emit({
+      event: 'PIPELINE_START',
+      workspaceId: workspace.id,
+      pipelineName: config.name ?? config.id,
+      steps: config.steps
+        .filter(s => activeSteps.has(s.id))
+        .map(s => ({id: s.id, displayName: s.name ?? s.id}))
+    })
     const levels = topologicalLevels(graph)
       .map(level => level.filter(id => activeSteps.has(id)))
       .filter(level => level.length > 0)

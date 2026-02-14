@@ -6,7 +6,8 @@ import {Workspace} from '../../engine/workspace.js'
 import {loadStepFile} from '../step-loader.js'
 import {StepRunner} from '../step-runner.js'
 import {StateManager} from '../state.js'
-import {ConsoleReporter, InteractiveReporter} from '../reporter.js'
+import {ConsoleReporter} from '../reporter.js'
+import {InteractiveReporter} from '../interactive-reporter.js'
 import {getGlobalOptions} from '../utils.js'
 
 export function registerExecCommand(program: Command): void {
