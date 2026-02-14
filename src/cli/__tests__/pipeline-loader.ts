@@ -1,5 +1,5 @@
 import test from 'ava'
-import {ValidationError} from '../../errors.js'
+import {CyclicDependencyError, ValidationError} from '../../errors.js'
 import {
   PipelineLoader,
   slugify,
@@ -285,4 +285,49 @@ test('parse: resolves kit step (uses → image/cmd)', t => {
 
   t.is(pipeline.steps[0].image, 'alpine:3.20')
   t.deepEqual(pipeline.steps[0].cmd, ['sh', '-c', 'echo hello'])
+})
+
+// ---------------------------------------------------------------------------
+// DAG validation
+// ---------------------------------------------------------------------------
+
+test('parse: detects cycle → CyclicDependencyError', t => {
+  const error = t.throws(() => loader.parse(JSON.stringify({
+    id: 'p',
+    steps: [
+      {id: 'a', image: 'alpine', cmd: ['echo'], inputs: [{step: 'b'}]},
+      {id: 'b', image: 'alpine', cmd: ['echo'], inputs: [{step: 'a'}]}
+    ]
+  }), 'p.json'), {message: /cycle/})
+  t.true(error instanceof CyclicDependencyError)
+})
+
+test('parse: missing input ref → error', t => {
+  t.throws(() => loader.parse(JSON.stringify({
+    id: 'p',
+    steps: [
+      {id: 'a', image: 'alpine', cmd: ['echo'], inputs: [{step: 'missing'}]}
+    ]
+  }), 'p.json'), {message: /unknown step 'missing'/})
+})
+
+test('parse: optional input to unknown step → OK', t => {
+  t.notThrows(() => loader.parse(JSON.stringify({
+    id: 'p',
+    steps: [
+      {id: 'a', image: 'alpine', cmd: ['echo'], inputs: [{step: 'missing', optional: true}]}
+    ]
+  }), 'p.json'))
+})
+
+test('parse: valid DAG diamond → OK', t => {
+  t.notThrows(() => loader.parse(JSON.stringify({
+    id: 'p',
+    steps: [
+      {id: 'a', image: 'alpine', cmd: ['echo']},
+      {id: 'b', image: 'alpine', cmd: ['echo'], inputs: [{step: 'a'}]},
+      {id: 'c', image: 'alpine', cmd: ['echo'], inputs: [{step: 'a'}]},
+      {id: 'd', image: 'alpine', cmd: ['echo'], inputs: [{step: 'b'}, {step: 'c'}]}
+    ]
+  }), 'p.json'))
 })

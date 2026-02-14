@@ -4,6 +4,7 @@ import {deburr} from 'lodash-es'
 import {parse as parseYaml} from 'yaml'
 import {ValidationError} from '../errors.js'
 import type {CacheSpec, MountSpec, Pipeline, PipelineDefinition, Step} from '../types.js'
+import {buildGraph, validateGraph} from './dag.js'
 import {resolveStep, validateStep} from './step-resolver.js'
 
 export class PipelineLoader {
@@ -32,6 +33,9 @@ export class PipelineLoader {
     }
 
     this.validateUniqueStepIds(steps)
+
+    const graph = buildGraph(steps)
+    validateGraph(graph, steps)
 
     return {id: pipelineId, name: input.name, steps}
   }

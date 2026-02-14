@@ -89,7 +89,9 @@ dockerTest('second run of same step is cached (STEP_SKIPPED)', async t => {
   const second = await runner.run({workspace, state, step, inputs: new Map(), pipelineRoot: '/'})
 
   t.is(first.runId, second.runId)
-  t.truthy(events.find(e => e.event === 'STEP_SKIPPED'))
+  const skipped = events.find(e => e.event === 'STEP_SKIPPED')
+  t.truthy(skipped)
+  t.is((skipped as {reason: string}).reason, 'cached')
 })
 
 // -- force -------------------------------------------------------------------

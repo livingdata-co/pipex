@@ -137,6 +137,8 @@ pipex clean
 | `--workspace <name>` | `-w` | Workspace name for caching |
 | `--force [steps]` | `-f` | Skip cache for all steps, or a comma-separated list |
 | `--dry-run` | | Validate pipeline, compute fingerprints, show what would run without executing |
+| `--target <steps>` | `-t` | Execute only these steps and their dependencies (comma-separated) |
+| `--concurrency <n>` | `-c` | Max parallel step executions (default: CPU count) |
 | `--verbose` | | Stream container logs in real-time (interactive mode) |
 
 ### Exec Options
@@ -290,11 +292,31 @@ steps:
 | `mounts` | MountSpec[] | Host directories to bind mount (read-only) |
 | `sources` | MountSpec[] | Host directories copied into the container's writable layer |
 | `caches` | CacheSpec[] | Persistent caches to mount |
+| `if` | string | Condition expression — step is skipped when it evaluates to false |
 | `timeoutSec` | number | Execution timeout |
+| `retries` | number | Number of retry attempts on transient failure |
+| `retryDelayMs` | number | Delay between retries (default: 5000) |
 | `allowFailure` | boolean | Continue pipeline if step fails |
 | `allowNetwork` | boolean | Enable network access |
 
-### Inputs
+### Step Dependencies and Parallel Execution
+
+Steps declare dependencies via `inputs`. Pipex automatically determines which steps can run in parallel based on the dependency graph. Steps at the same level (no dependency between them) execute concurrently, up to `--concurrency` (defaults to CPU count).
+
+```yaml
+steps:
+  - id: download
+    # ...
+  - id: process-a
+    inputs: [{ step: download }]      # waits for download
+  - id: process-b
+    inputs: [{ step: download }]      # waits for download
+  # process-a and process-b run in parallel
+  - id: merge
+    inputs: [{ step: process-a }, { step: process-b }]  # waits for both
+```
+
+#### Inputs
 
 Mount previous steps as read-only:
 
@@ -303,10 +325,45 @@ inputs:
   - step: step1
   - step: step2
     copyToOutput: true
+  - step: step3
+    optional: true
 ```
 
 - Mounted under `/input/{stepName}/`
 - `copyToOutput: true` copies content to output before execution
+- `optional: true` allows the step to run even if the dependency failed or was skipped
+
+#### Targeted Execution
+
+Use `--target` to execute only specific steps and their dependencies:
+
+```bash
+# Only run 'merge' and everything it depends on
+pipex run pipeline.yaml --target merge
+
+# Multiple targets
+pipex run pipeline.yaml --target process-a,process-b
+```
+
+### Conditional Steps
+
+Steps can be conditionally skipped using `if:` with a [JEXL](https://github.com/TomFrost/Jexl) expression. The expression is evaluated against the current environment variables via `env`:
+
+```yaml
+- id: notify
+  if: env.CI
+  uses: shell
+  with:
+    run: echo "Running in CI"
+
+- id: deploy
+  if: env.NODE_ENV == "production"
+  uses: shell
+  with:
+    run: echo "Deploying..."
+```
+
+When a condition evaluates to false, the step is skipped. Steps that depend on a skipped step with a required (non-optional) input are also skipped.
 
 ### Host Mounts
 
@@ -374,7 +431,7 @@ Common use cases:
 
 ### Geodata Processing
 
-The `examples/geodata/` pipeline downloads a shapefile archive, extracts it, and produces a CSV inventory — using the `debian` and `bash` kits:
+The `examples/geodata/` pipeline downloads a shapefile archive, extracts it, and produces a CSV inventory. The last two steps run in parallel:
 
 ```
 examples/geodata/
@@ -385,6 +442,28 @@ Steps: `download` → `extract` → `list-files` / `build-csv`
 
 ```bash
 pipex run examples/geodata/pipeline.yaml
+```
+
+### Text Processing
+
+The `examples/text-processing/` pipeline demonstrates parallel branches, conditional steps, and optional inputs:
+
+```
+examples/text-processing/
+└── pipeline.yaml
+```
+
+Steps: `generate` → `stats` + `filter` (parallel) → `report` → `notify` (conditional), with `audit` (conditional, optional input to `notify`)
+
+```bash
+# Default: notify and audit are skipped (conditions not met)
+pipex run examples/text-processing/pipeline.yaml
+
+# Enable notifications
+NOTIFY=1 pipex run examples/text-processing/pipeline.yaml
+
+# Only run stats and its dependencies
+pipex run examples/text-processing/pipeline.yaml --target stats
 ```
 
 ### Multi-Language

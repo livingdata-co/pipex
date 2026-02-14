@@ -21,6 +21,8 @@ export type InputSpec = {
   step: string;
   /** If true, the input artifact is copied into the output staging area before execution. */
   copyToOutput?: boolean;
+  /** If true, the step can execute even when this input's step was skipped or failed. */
+  optional?: boolean;
 }
 
 /** Persistent read-write cache mount, shared across steps and executions. */
@@ -60,6 +62,8 @@ export type Step = {
   retries?: number;
   /** Delay in milliseconds between retry attempts (default: 5000). */
   retryDelayMs?: number;
+  /** Jexl condition expression; step is skipped when it evaluates to falsy. */
+  if?: string;
 }
 
 /** A pipeline whose steps have all been resolved. */
@@ -98,6 +102,7 @@ export type KitStepDefinition = {
   allowNetwork?: boolean;
   retries?: number;
   retryDelayMs?: number;
+  if?: string;
 }
 
 /**

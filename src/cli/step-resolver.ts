@@ -41,7 +41,8 @@ function resolveKitStep(step: KitStepDefinition, id: string, name: string | unde
     allowFailure: step.allowFailure,
     allowNetwork: step.allowNetwork ?? kitOutput.allowNetwork,
     retries: step.retries,
-    retryDelayMs: step.retryDelayMs
+    retryDelayMs: step.retryDelayMs,
+    if: step.if
   }
 }
 

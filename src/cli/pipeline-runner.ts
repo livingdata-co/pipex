@@ -1,37 +1,21 @@
+import process from 'node:process'
+import {cpus} from 'node:os'
 import {cp, writeFile} from 'node:fs/promises'
 import {setTimeout} from 'node:timers/promises'
 import {createWriteStream, type WriteStream} from 'node:fs'
 import {dirname, join, resolve} from 'node:path'
 import {Workspace, type ContainerExecutor, type InputMount, type OutputMount, type CacheMount, type BindMount} from '../engine/index.js'
-import {ContainerCrashError, StepNotFoundError, PipexError} from '../errors.js'
+import {ContainerCrashError, PipexError} from '../errors.js'
 import type {Step} from '../types.js'
 import type {Reporter, StepRef} from './reporter.js'
 import type {PipelineLoader} from './pipeline-loader.js'
+import {buildGraph, topologicalLevels, subgraph, leafNodes} from './dag.js'
+import {evaluateCondition} from './condition.js'
 import {StateManager} from './state.js'
 import {dirSize} from './utils.js'
 
 /**
- * Orchestrates pipeline execution with dependency resolution and caching.
- *
- * ## Workflow
- *
- * 1. **Workspace Resolution**: Determines workspace ID from CLI flag, config, or filename
- * 2. **State Loading**: Loads cached fingerprints from state.json
- * 3. **Step Execution**: For each step:
- *    a. Computes fingerprint (image + cmd + env + input run IDs)
- *    b. Checks cache (fingerprint match + run exists)
- *    c. If cached: skips execution
- *    d. If not cached: resolves inputs, prepares staging, executes container
- *    e. On success: writes meta.json, commits run, saves state
- *    f. On failure: discards run, halts pipeline (unless allowFailure)
- * 4. **Completion**: Reports final pipeline status
- *
- * ## Runs
- *
- * Each step execution produces a **run** containing:
- * - `artifacts/` — files produced by the step
- * - `stdout.log` / `stderr.log` — captured container logs
- * - `meta.json` — structured execution metadata
+ * Orchestrates pipeline execution with DAG-based parallel execution and caching.
  */
 export class PipelineRunner {
   constructor(
@@ -41,8 +25,14 @@ export class PipelineRunner {
     private readonly workdirRoot: string
   ) {}
 
-  async run(pipelineFilePath: string, options?: {workspace?: string; force?: true | string[]; dryRun?: boolean}): Promise<void> {
-    const {workspace: workspaceName, force, dryRun} = options ?? {}
+  async run(pipelineFilePath: string, options?: {
+    workspace?: string;
+    force?: true | string[];
+    dryRun?: boolean;
+    target?: string[];
+    concurrency?: number;
+  }): Promise<void> {
+    const {workspace: workspaceName, force, dryRun, target, concurrency} = options ?? {}
     const config = await this.loader.load(pipelineFilePath)
     const pipelineRoot = dirname(resolve(pipelineFilePath))
 
@@ -68,39 +58,106 @@ export class PipelineRunner {
 
     this.reporter.emit({event: 'PIPELINE_START', workspaceId: workspace.id, pipelineName: config.name ?? config.id})
 
-    for (const step of config.steps) {
-      const stepRef: StepRef = {id: step.id, displayName: step.name ?? step.id}
-      const inputRunIds = step.inputs
-        ?.map(i => stepRuns.get(i.step))
-        .filter((id): id is string => id !== undefined)
-      const resolvedMounts = step.mounts?.map(m => ({
-        hostPath: resolve(pipelineRoot, m.host),
-        containerPath: m.container
-      }))
-      const currentFingerprint = StateManager.fingerprint({
-        image: step.image,
-        cmd: step.cmd,
-        env: step.env,
-        inputRunIds,
-        mounts: resolvedMounts
+    // Build DAG and determine execution scope
+    const graph = buildGraph(config.steps)
+    const targets = target ?? leafNodes(graph)
+    const activeSteps = subgraph(graph, targets)
+    const levels = topologicalLevels(graph)
+      .map(level => level.filter(id => activeSteps.has(id)))
+      .filter(level => level.length > 0)
+
+    const stepMap = new Map(config.steps.map(s => [s.id, s]))
+    const failed = new Set<string>()
+    const skipped = new Set<string>()
+    const maxConcurrency = concurrency ?? cpus().length
+
+    for (const level of levels) {
+      const tasks = level.map(stepId => async () => {
+        const step = stepMap.get(stepId)!
+        const stepRef: StepRef = {id: step.id, displayName: step.name ?? step.id}
+
+        // Check if blocked by a failed/skipped required dependency
+        if (this.isDependencyBlocked(step, failed, skipped)) {
+          skipped.add(step.id)
+          this.reporter.emit({event: 'STEP_SKIPPED', workspaceId: workspace.id, step: stepRef, reason: 'dependency'})
+          return 0
+        }
+
+        // Evaluate condition
+        if (step.if) {
+          const conditionMet = await evaluateCondition(step.if, {env: process.env})
+          if (!conditionMet) {
+            skipped.add(step.id)
+            this.reporter.emit({event: 'STEP_SKIPPED', workspaceId: workspace.id, step: stepRef, reason: 'condition'})
+            return 0
+          }
+        }
+
+        // Compute fingerprint
+        const inputRunIds = step.inputs
+          ?.map(i => stepRuns.get(i.step))
+          .filter((id): id is string => id !== undefined)
+        const resolvedMounts = step.mounts?.map(m => ({
+          hostPath: resolve(pipelineRoot, m.host),
+          containerPath: m.container
+        }))
+        const currentFingerprint = StateManager.fingerprint({
+          image: step.image,
+          cmd: step.cmd,
+          env: step.env,
+          inputRunIds,
+          mounts: resolvedMounts
+        })
+
+        // Cache check
+        const skipCache = force === true || (Array.isArray(force) && force.includes(step.id))
+        if (!skipCache && await this.tryUseCache({workspace, state, step, stepRef, currentFingerprint, stepRuns})) {
+          return 0
+        }
+
+        // Dry run
+        if (dryRun) {
+          this.reporter.emit({event: 'STEP_WOULD_RUN', workspaceId: workspace.id, step: stepRef})
+          return 0
+        }
+
+        // Execute
+        this.reporter.emit({event: 'STEP_STARTING', workspaceId: workspace.id, step: stepRef})
+        return this.executeStep({workspace, state, step, stepRef, stepRuns, currentFingerprint, resolvedMounts, pipelineRoot})
       })
 
-      const skipCache = force === true || (Array.isArray(force) && force.includes(step.id))
-      if (!skipCache && await this.tryUseCache({workspace, state, step, stepRef, currentFingerprint, stepRuns})) {
-        continue
+      const results = await withConcurrency(tasks, maxConcurrency)
+
+      // Collect results
+      for (const [i, result] of results.entries()) {
+        const stepId = level[i]
+        if (result.status === 'fulfilled') {
+          totalArtifactSize += result.value
+        } else if (!failed.has(stepId)) {
+          // Step threw an error (ContainerCrashError if not allowFailure)
+          failed.add(stepId)
+        }
       }
 
-      if (dryRun) {
-        this.reporter.emit({event: 'STEP_WOULD_RUN', workspaceId: workspace.id, step: stepRef})
-        continue
-      }
+      await state.save()
+    }
 
-      this.reporter.emit({event: 'STEP_STARTING', workspaceId: workspace.id, step: stepRef})
-      const stepArtifactSize = await this.executeStep({workspace, state, step, stepRef, stepRuns, currentFingerprint, resolvedMounts, pipelineRoot})
-      totalArtifactSize += stepArtifactSize
+    if (failed.size > 0) {
+      this.reporter.emit({event: 'PIPELINE_FAILED', workspaceId: workspace.id})
+      // Re-throw the first failure to signal pipeline failure to the CLI
+      const firstFailedId = [...failed][0]
+      throw new ContainerCrashError(firstFailedId, 1)
     }
 
     this.reporter.emit({event: 'PIPELINE_FINISHED', workspaceId: workspace.id, totalArtifactSize})
+  }
+
+  private isDependencyBlocked(step: Step, failed: Set<string>, skippedSteps: Set<string>): boolean {
+    if (!step.inputs) {
+      return false
+    }
+
+    return step.inputs.some(input => !input.optional && (failed.has(input.step) || skippedSteps.has(input.step)))
   }
 
   private async executeStep({workspace, state, step, stepRef, stepRuns, currentFingerprint, resolvedMounts, pipelineRoot}: {
@@ -189,7 +246,6 @@ export class PipelineRunner {
         stepRuns.set(step.id, runId)
 
         state.setStep(step.id, runId, currentFingerprint)
-        await state.save()
 
         const durationMs = result.finishedAt.getTime() - result.startedAt.getTime()
         const artifactSize = await dirSize(workspace.runArtifactsPath(runId))
@@ -199,7 +255,6 @@ export class PipelineRunner {
 
       await workspace.discardRun(runId)
       this.reporter.emit({event: 'STEP_FAILED', workspaceId: workspace.id, step: stepRef, exitCode: result.exitCode})
-      this.reporter.emit({event: 'PIPELINE_FAILED', workspaceId: workspace.id})
       throw new ContainerCrashError(step.id, result.exitCode)
     } catch (error) {
       await closeStream(stdoutLog)
@@ -263,7 +318,7 @@ export class PipelineRunner {
         if (runs.includes(cached.runId)) {
           stepRuns.set(step.id, cached.runId)
           await workspace.linkRun(step.id, cached.runId)
-          this.reporter.emit({event: 'STEP_SKIPPED', workspaceId: workspace.id, step: stepRef, runId: cached.runId})
+          this.reporter.emit({event: 'STEP_SKIPPED', workspaceId: workspace.id, step: stepRef, runId: cached.runId, reason: 'cached'})
           return true
         }
       } catch {
@@ -276,7 +331,7 @@ export class PipelineRunner {
 
   private async prepareStagingWithInputs(
     workspace: Workspace,
-    step: {id: string; inputs?: Array<{step: string; copyToOutput?: boolean}>},
+    step: {id: string; inputs?: Array<{step: string; copyToOutput?: boolean; optional?: boolean}>},
     stagingArtifactsPath: string,
     stepRuns: Map<string, string>
   ): Promise<void> {
@@ -287,7 +342,13 @@ export class PipelineRunner {
     for (const input of step.inputs) {
       const inputRunId = stepRuns.get(input.step)
       if (!inputRunId) {
-        throw new StepNotFoundError(step.id, input.step)
+        if (input.optional) {
+          continue
+        }
+
+        // Non-optional input without a run — this shouldn't happen in DAG mode
+        // but keep the continue for safety (the step may still work with bind mounts)
+        continue
       }
 
       if (input.copyToOutput) {
@@ -339,6 +400,28 @@ export class PipelineRunner {
 
     return {inputs, output, caches, mounts}
   }
+}
+
+async function withConcurrency<T>(
+  tasks: Array<() => Promise<T>>,
+  limit: number
+): Promise<Array<PromiseSettledResult<T>>> {
+  const results: Array<PromiseSettledResult<T>> = Array.from({length: tasks.length})
+  let next = 0
+
+  async function worker() {
+    while (next < tasks.length) {
+      const i = next++
+      try {
+        results[i] = {status: 'fulfilled', value: await tasks[i]()}
+      } catch (error) {
+        results[i] = {status: 'rejected', reason: error}
+      }
+    }
+  }
+
+  await Promise.all(Array.from({length: Math.min(limit, tasks.length)}, async () => worker()))
+  return results
 }
 
 async function closeStream(stream: WriteStream): Promise<void> {

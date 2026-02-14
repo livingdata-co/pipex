@@ -29,6 +29,7 @@ export type PipelineStartEvent = {
   workspaceId: string;
   pipelineName: string;
   jobId?: string;
+  groupId?: string;
 }
 
 export type StepStartingEvent = {
@@ -36,14 +37,17 @@ export type StepStartingEvent = {
   workspaceId: string;
   step: StepRef;
   jobId?: string;
+  groupId?: string;
 }
 
 export type StepSkippedEvent = {
   event: 'STEP_SKIPPED';
   workspaceId: string;
   step: StepRef;
-  runId: string;
+  runId?: string;
+  reason: 'cached' | 'condition' | 'dependency';
   jobId?: string;
+  groupId?: string;
 }
 
 export type StepFinishedEvent = {
@@ -55,6 +59,7 @@ export type StepFinishedEvent = {
   artifactSize?: number;
   ephemeral?: boolean;
   jobId?: string;
+  groupId?: string;
 }
 
 export type StepFailedEvent = {
@@ -63,6 +68,7 @@ export type StepFailedEvent = {
   step: StepRef;
   exitCode: number;
   jobId?: string;
+  groupId?: string;
 }
 
 export type StepRetryingEvent = {
@@ -72,6 +78,7 @@ export type StepRetryingEvent = {
   attempt: number;
   maxRetries: number;
   jobId?: string;
+  groupId?: string;
 }
 
 export type StepWouldRunEvent = {
@@ -79,6 +86,7 @@ export type StepWouldRunEvent = {
   workspaceId: string;
   step: StepRef;
   jobId?: string;
+  groupId?: string;
 }
 
 export type PipelineFinishedEvent = {
@@ -86,12 +94,14 @@ export type PipelineFinishedEvent = {
   workspaceId: string;
   totalArtifactSize: number;
   jobId?: string;
+  groupId?: string;
 }
 
 export type PipelineFailedEvent = {
   event: 'PIPELINE_FAILED';
   workspaceId: string;
   jobId?: string;
+  groupId?: string;
 }
 
 export type PipelineEvent =
@@ -170,12 +180,17 @@ export class InteractiveReporter implements Reporter {
       }
 
       case 'STEP_SKIPPED': {
+        const reasonLabel = event.reason === 'cached'
+          ? '(cached)'
+          : (event.reason === 'condition'
+            ? '(condition)'
+            : '(dependency skipped)')
         const spinner = this.stepSpinners.get(event.step.id)
         if (spinner) {
-          spinner.stopAndPersist({symbol: chalk.gray('⊙'), text: chalk.gray(`${event.step.displayName} (cached)`)})
+          spinner.stopAndPersist({symbol: chalk.gray('⊙'), text: chalk.gray(`${event.step.displayName} ${reasonLabel}`)})
           this.stepSpinners.delete(event.step.id)
         } else {
-          console.log(`  ${chalk.gray('⊙')} ${chalk.gray(`${event.step.displayName} (cached)`)}`)
+          console.log(`  ${chalk.gray('⊙')} ${chalk.gray(`${event.step.displayName} ${reasonLabel}`)}`)
         }
 
         break

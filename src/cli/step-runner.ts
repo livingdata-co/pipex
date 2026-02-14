@@ -98,7 +98,7 @@ export class StepRunner {
       const runs = await workspace.listRuns()
       if (runs.includes(cached.runId)) {
         await workspace.linkRun(stepId, cached.runId)
-        this.reporter.emit({event: 'STEP_SKIPPED', workspaceId: workspace.id, step: stepRef, runId: cached.runId})
+        this.reporter.emit({event: 'STEP_SKIPPED', workspaceId: workspace.id, step: stepRef, runId: cached.runId, reason: 'cached'})
         return {runId: cached.runId, exitCode: 0}
       }
     }

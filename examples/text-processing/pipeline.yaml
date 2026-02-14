@@ -1,0 +1,89 @@
+name: Text Processing
+steps:
+  # Step 1: Generate sample text data
+  - id: generate
+    name: Generate Sample Data
+    uses: shell
+    with:
+      run: |
+        cat > /output/data.txt << 'DATA'
+        Alice,Engineering,72000
+        Bob,Marketing,65000
+        Charlie,Engineering,80000
+        Diana,Marketing,70000
+        Eve,Engineering,90000
+        Frank,Sales,60000
+        Grace,Sales,55000
+        Henry,Engineering,85000
+        DATA
+        echo "Generated $(wc -l < /output/data.txt) records"
+
+  # Steps 2a and 2b run in parallel (both depend only on 'generate')
+  - id: stats
+    name: Compute Statistics
+    uses: shell
+    with:
+      run: |
+        echo "=== Department Statistics ==="
+        awk -F, '{dept[$2]+=$3; count[$2]++} END {for (d in dept) printf "%s: %d employees, avg salary $%d\n", d, count[d], dept[d]/count[d]}' \
+          /input/generate/data.txt | sort > /output/stats.txt
+        cat /output/stats.txt
+    inputs: [{ step: generate }]
+
+  - id: filter
+    name: Filter High Earners
+    uses: shell
+    with:
+      run: |
+        echo "=== Employees earning > $70,000 ==="
+        awk -F, '$3 > 70000 {print $1, $2, "$"$3}' /input/generate/data.txt > /output/high-earners.txt
+        cat /output/high-earners.txt
+    inputs: [{ step: generate }]
+
+  # Step 3: Merge results from both parallel branches
+  - id: report
+    name: Build Report
+    uses: shell
+    with:
+      run: |
+        echo "=== FINAL REPORT ===" > /output/report.txt
+        echo "" >> /output/report.txt
+        cat /input/stats/stats.txt >> /output/report.txt
+        echo "" >> /output/report.txt
+        echo "--- High earners ---" >> /output/report.txt
+        cat /input/filter/high-earners.txt >> /output/report.txt
+        echo "" >> /output/report.txt
+        echo "Report generated on $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> /output/report.txt
+        cat /output/report.txt
+    inputs:
+      - { step: stats }
+      - { step: filter }
+
+  # Step 4: Conditional — only runs when NOTIFY env var is set
+  - id: notify
+    name: Send Notification
+    if: env.NOTIFY
+    uses: shell
+    with:
+      run: |
+        echo "Would notify: report ready ($(wc -l < /input/report/report.txt) lines)"
+        echo "notification_sent=true" > /output/status.txt
+    inputs:
+      - { step: report }
+      - { step: audit, optional: true }
+
+  # Step 5: Optional audit step — only runs when AUDIT env var is set
+  - id: audit
+    name: Audit Trail
+    if: env.AUDIT
+    uses: shell
+    with:
+      run: |
+        echo "=== AUDIT LOG ===" > /output/audit.txt
+        echo "Pipeline run at $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> /output/audit.txt
+        echo "Input records: $(wc -l < /input/generate/data.txt)" >> /output/audit.txt
+        echo "High earners: $(wc -l < /input/filter/high-earners.txt)" >> /output/audit.txt
+        cat /output/audit.txt
+    inputs:
+      - { step: generate }
+      - { step: filter }

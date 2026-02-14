@@ -15,7 +15,9 @@ export function registerRunCommand(program: Command): void {
     .option('-f, --force [steps]', 'Skip cache for all steps, or a comma-separated list (e.g. --force step1,step2)')
     .option('--dry-run', 'Validate pipeline and show what would run without executing')
     .option('--verbose', 'Stream container logs in real-time (interactive mode)')
-    .action(async (pipelineFile: string, options: {workspace?: string; force?: string | boolean; dryRun?: boolean; verbose?: boolean}, cmd: Command) => {
+    .option('-t, --target <steps>', 'Execute only these steps and their dependencies (comma-separated)')
+    .option('-c, --concurrency <number>', 'Max parallel step executions (default: CPU count)', Number)
+    .action(async (pipelineFile: string, options: {workspace?: string; force?: string | boolean; dryRun?: boolean; verbose?: boolean; target?: string; concurrency?: number}, cmd: Command) => {
       const {workdir, json} = getGlobalOptions(cmd)
       const workdirRoot = resolve(workdir)
       const loader = new PipelineLoader()
@@ -28,7 +30,8 @@ export function registerRunCommand(program: Command): void {
         const force = options.force === true
           ? true
           : (typeof options.force === 'string' ? options.force.split(',') : undefined)
-        await runner.run(pipelineFile, {workspace: options.workspace, force, dryRun: options.dryRun})
+        const target = options.target ? options.target.split(',') : undefined
+        await runner.run(pipelineFile, {workspace: options.workspace, force, dryRun: options.dryRun, target, concurrency: options.concurrency})
         if (json) {
           console.log('Pipeline completed')
         }

@@ -6,6 +6,7 @@ import {DockerCliExecutor} from '../../engine/docker-executor.js'
 import {PipelineLoader} from '../pipeline-loader.js'
 import {PipelineRunner} from '../pipeline-runner.js'
 import {Workspace} from '../../engine/workspace.js'
+import {ContainerCrashError} from '../../errors.js'
 import type {StepFinishedEvent, StepSkippedEvent, StepStartingEvent} from '../reporter.js'
 import {createTmpDir, isDockerAvailable, noopReporter, recordingReporter} from '../../__tests__/helpers.js'
 
@@ -192,4 +193,142 @@ dockerTest('dryRun emits STEP_WOULD_RUN without executing or committing', async 
   const ws = await Workspace.open(workdir, 'dry-run')
   const runs = await ws.listRuns()
   t.is(runs.length, 0)
+})
+
+// -- diamond DAG A→B, A→C, B+C→D --------------------------------------------
+
+dockerTest('diamond DAG executes all steps in correct order', async t => {
+  const tmpDir = await createTmpDir()
+  const workdir = await createTmpDir()
+
+  const pipelinePath = await writePipeline(tmpDir, {
+    id: 'diamond',
+    steps: [
+      {id: 'a', image: 'alpine:3.20', cmd: ['sh', '-c', 'echo a > /output/a.txt']},
+      {id: 'b', image: 'alpine:3.20', cmd: ['sh', '-c', 'cat /input/a/a.txt > /output/b.txt'], inputs: [{step: 'a'}]},
+      {id: 'c', image: 'alpine:3.20', cmd: ['sh', '-c', 'cat /input/a/a.txt > /output/c.txt'], inputs: [{step: 'a'}]},
+      {id: 'd', image: 'alpine:3.20', cmd: ['sh', '-c', 'cat /input/b/b.txt /input/c/c.txt > /output/d.txt'], inputs: [{step: 'b'}, {step: 'c'}]}
+    ]
+  })
+
+  const {reporter, events} = recordingReporter()
+  await new PipelineRunner(new PipelineLoader(), new DockerCliExecutor(), reporter, workdir).run(pipelinePath)
+
+  const finished = events.filter((e): e is StepFinishedEvent => e.event === 'STEP_FINISHED')
+  t.is(finished.length, 4)
+})
+
+// -- failed step → dependents skipped ----------------------------------------
+
+dockerTest('failed step causes dependents to be skipped with reason dependency', async t => {
+  const tmpDir = await createTmpDir()
+  const workdir = await createTmpDir()
+
+  const pipelinePath = await writePipeline(tmpDir, {
+    id: 'fail-dep',
+    steps: [
+      {id: 'a', image: 'alpine:3.20', cmd: ['sh', '-c', 'exit 1']},
+      {id: 'b', image: 'alpine:3.20', cmd: ['sh', '-c', 'echo b > /output/b.txt'], inputs: [{step: 'a'}]}
+    ]
+  })
+
+  const {reporter, events} = recordingReporter()
+  await t.throwsAsync(
+    async () => new PipelineRunner(new PipelineLoader(), new DockerCliExecutor(), reporter, workdir).run(pipelinePath),
+    {instanceOf: ContainerCrashError}
+  )
+
+  const skipped = events.filter((e): e is StepSkippedEvent => e.event === 'STEP_SKIPPED')
+  t.is(skipped.length, 1)
+  t.is(skipped[0].step.id, 'b')
+  t.is(skipped[0].reason, 'dependency')
+})
+
+// -- optional input → step runs despite missing input ------------------------
+
+dockerTest('optional input allows step to run when input step is missing', async t => {
+  const tmpDir = await createTmpDir()
+  const workdir = await createTmpDir()
+
+  const pipelinePath = await writePipeline(tmpDir, {
+    id: 'opt-input',
+    steps: [
+      {id: 'a', image: 'alpine:3.20', cmd: ['sh', '-c', 'exit 1']},
+      {id: 'b', image: 'alpine:3.20', cmd: ['sh', '-c', 'echo b > /output/b.txt'], inputs: [{step: 'a', optional: true}]}
+    ]
+  })
+
+  const {reporter, events} = recordingReporter()
+  await t.throwsAsync(
+    async () => new PipelineRunner(new PipelineLoader(), new DockerCliExecutor(), reporter, workdir).run(pipelinePath)
+  )
+
+  // Step b should have been attempted (STEP_STARTING)
+  const starting = events.filter((e): e is StepStartingEvent => e.event === 'STEP_STARTING')
+  t.true(starting.some(e => e.step.id === 'b'))
+})
+
+// -- if condition → step skipped ---------------------------------------------
+
+dockerTest('if: "1 == 2" skips step with reason condition', async t => {
+  const tmpDir = await createTmpDir()
+  const workdir = await createTmpDir()
+
+  const pipelinePath = await writePipeline(tmpDir, {
+    id: 'cond-skip',
+    steps: [
+      {id: 'a', image: 'alpine:3.20', cmd: ['sh', '-c', 'echo a > /output/a.txt'], if: '1 == 2'}
+    ]
+  })
+
+  const {reporter, events} = recordingReporter()
+  await new PipelineRunner(new PipelineLoader(), new DockerCliExecutor(), reporter, workdir).run(pipelinePath)
+
+  const skipped = events.filter((e): e is StepSkippedEvent => e.event === 'STEP_SKIPPED')
+  t.is(skipped.length, 1)
+  t.is(skipped[0].reason, 'condition')
+})
+
+// -- --target → only subgraph executes ---------------------------------------
+
+dockerTest('--target executes only the targeted step and its dependencies', async t => {
+  const tmpDir = await createTmpDir()
+  const workdir = await createTmpDir()
+
+  const pipelinePath = await writePipeline(tmpDir, {
+    id: 'target-test',
+    steps: [
+      {id: 'a', image: 'alpine:3.20', cmd: ['sh', '-c', 'echo a > /output/a.txt']},
+      {id: 'b', image: 'alpine:3.20', cmd: ['sh', '-c', 'echo b > /output/b.txt'], inputs: [{step: 'a'}]},
+      {id: 'c', image: 'alpine:3.20', cmd: ['sh', '-c', 'echo c > /output/c.txt']}
+    ]
+  })
+
+  const {reporter, events} = recordingReporter()
+  await new PipelineRunner(new PipelineLoader(), new DockerCliExecutor(), reporter, workdir).run(pipelinePath, {target: ['b']})
+
+  const finished = events.filter((e): e is StepFinishedEvent => e.event === 'STEP_FINISHED')
+  const executedIds = finished.map(e => e.step.id).sort()
+  t.deepEqual(executedIds, ['a', 'b'])
+})
+
+// -- independent steps → parallel execution ----------------------------------
+
+dockerTest('independent steps both finish (parallel execution)', async t => {
+  const tmpDir = await createTmpDir()
+  const workdir = await createTmpDir()
+
+  const pipelinePath = await writePipeline(tmpDir, {
+    id: 'parallel',
+    steps: [
+      {id: 'a', image: 'alpine:3.20', cmd: ['sh', '-c', 'echo a > /output/a.txt']},
+      {id: 'b', image: 'alpine:3.20', cmd: ['sh', '-c', 'echo b > /output/b.txt']}
+    ]
+  })
+
+  const {reporter, events} = recordingReporter()
+  await new PipelineRunner(new PipelineLoader(), new DockerCliExecutor(), reporter, workdir).run(pipelinePath)
+
+  const finished = events.filter((e): e is StepFinishedEvent => e.event === 'STEP_FINISHED')
+  t.is(finished.length, 2)
 })
