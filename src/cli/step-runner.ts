@@ -65,7 +65,7 @@ export class StepRunner {
       }
     }
 
-    this.reporter.state(workspace.id, 'STEP_STARTING', stepRef)
+    this.reporter.emit({event: 'STEP_STARTING', workspaceId: workspace.id, step: stepRef})
     return this.executeStep({workspace, state, step, stepRef, inputs, pipelineRoot, ephemeral, currentFingerprint, resolvedMounts})
   }
 
@@ -98,7 +98,7 @@ export class StepRunner {
       const runs = await workspace.listRuns()
       if (runs.includes(cached.runId)) {
         await workspace.linkRun(stepId, cached.runId)
-        this.reporter.state(workspace.id, 'STEP_SKIPPED', stepRef, {runId: cached.runId, reason: 'cached'})
+        this.reporter.emit({event: 'STEP_SKIPPED', workspaceId: workspace.id, step: stepRef, runId: cached.runId})
         return {runId: cached.runId, exitCode: 0}
       }
     }
@@ -130,7 +130,7 @@ export class StepRunner {
 
       if (ephemeral) {
         await workspace.discardRun(runId)
-        this.reporter.state(workspace.id, 'STEP_FINISHED', stepRef, {ephemeral: true})
+        this.reporter.emit({event: 'STEP_FINISHED', workspaceId: workspace.id, step: stepRef, ephemeral: true})
         return {exitCode: result.exitCode}
       }
 
@@ -237,7 +237,7 @@ export class StepRunner {
         break
       } catch (error) {
         if (error instanceof PipexError && error.transient && attempt < maxRetries) {
-          this.reporter.state(workspace.id, 'STEP_RETRYING', stepRef, {attempt: attempt + 1, maxRetries})
+          this.reporter.emit({event: 'STEP_RETRYING', workspaceId: workspace.id, step: stepRef, attempt: attempt + 1, maxRetries})
           await setTimeout(retryDelay)
           continue
         }
@@ -286,12 +286,12 @@ export class StepRunner {
 
       const durationMs = result.finishedAt.getTime() - result.startedAt.getTime()
       const artifactSize = await dirSize(workspace.runArtifactsPath(runId))
-      this.reporter.state(workspace.id, 'STEP_FINISHED', stepRef, {runId, durationMs, artifactSize})
+      this.reporter.emit({event: 'STEP_FINISHED', workspaceId: workspace.id, step: stepRef, runId, durationMs, artifactSize})
       return {runId, exitCode: result.exitCode}
     }
 
     await workspace.discardRun(runId)
-    this.reporter.state(workspace.id, 'STEP_FAILED', stepRef, {exitCode: result.exitCode})
+    this.reporter.emit({event: 'STEP_FAILED', workspaceId: workspace.id, step: stepRef, exitCode: result.exitCode})
     throw new ContainerCrashError(step.id, result.exitCode)
   }
 }

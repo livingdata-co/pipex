@@ -66,7 +66,7 @@ export class PipelineRunner {
     const stepRuns = new Map<string, string>()
     let totalArtifactSize = 0
 
-    this.reporter.state(workspace.id, 'PIPELINE_START', undefined, {pipelineName: config.name ?? config.id})
+    this.reporter.emit({event: 'PIPELINE_START', workspaceId: workspace.id, pipelineName: config.name ?? config.id})
 
     for (const step of config.steps) {
       const stepRef: StepRef = {id: step.id, displayName: step.name ?? step.id}
@@ -91,16 +91,16 @@ export class PipelineRunner {
       }
 
       if (dryRun) {
-        this.reporter.state(workspace.id, 'STEP_WOULD_RUN', stepRef)
+        this.reporter.emit({event: 'STEP_WOULD_RUN', workspaceId: workspace.id, step: stepRef})
         continue
       }
 
-      this.reporter.state(workspace.id, 'STEP_STARTING', stepRef)
+      this.reporter.emit({event: 'STEP_STARTING', workspaceId: workspace.id, step: stepRef})
       const stepArtifactSize = await this.executeStep({workspace, state, step, stepRef, stepRuns, currentFingerprint, resolvedMounts, pipelineRoot})
       totalArtifactSize += stepArtifactSize
     }
 
-    this.reporter.state(workspace.id, 'PIPELINE_FINISHED', undefined, {totalArtifactSize})
+    this.reporter.emit({event: 'PIPELINE_FINISHED', workspaceId: workspace.id, totalArtifactSize})
   }
 
   private async executeStep({workspace, state, step, stepRef, stepRuns, currentFingerprint, resolvedMounts, pipelineRoot}: {
@@ -167,7 +167,7 @@ export class PipelineRunner {
           break
         } catch (error) {
           if (error instanceof PipexError && error.transient && attempt < maxRetries) {
-            this.reporter.state(workspace.id, 'STEP_RETRYING', stepRef, {attempt: attempt + 1, maxRetries})
+            this.reporter.emit({event: 'STEP_RETRYING', workspaceId: workspace.id, step: stepRef, attempt: attempt + 1, maxRetries})
             await setTimeout(retryDelay)
             continue
           }
@@ -193,13 +193,13 @@ export class PipelineRunner {
 
         const durationMs = result.finishedAt.getTime() - result.startedAt.getTime()
         const artifactSize = await dirSize(workspace.runArtifactsPath(runId))
-        this.reporter.state(workspace.id, 'STEP_FINISHED', stepRef, {runId, durationMs, artifactSize})
+        this.reporter.emit({event: 'STEP_FINISHED', workspaceId: workspace.id, step: stepRef, runId, durationMs, artifactSize})
         return artifactSize
       }
 
       await workspace.discardRun(runId)
-      this.reporter.state(workspace.id, 'STEP_FAILED', stepRef, {exitCode: result.exitCode})
-      this.reporter.state(workspace.id, 'PIPELINE_FAILED')
+      this.reporter.emit({event: 'STEP_FAILED', workspaceId: workspace.id, step: stepRef, exitCode: result.exitCode})
+      this.reporter.emit({event: 'PIPELINE_FAILED', workspaceId: workspace.id})
       throw new ContainerCrashError(step.id, result.exitCode)
     } catch (error) {
       await closeStream(stdoutLog)
@@ -263,7 +263,7 @@ export class PipelineRunner {
         if (runs.includes(cached.runId)) {
           stepRuns.set(step.id, cached.runId)
           await workspace.linkRun(step.id, cached.runId)
-          this.reporter.state(workspace.id, 'STEP_SKIPPED', stepRef, {runId: cached.runId, reason: 'cached'})
+          this.reporter.emit({event: 'STEP_SKIPPED', workspaceId: workspace.id, step: stepRef, runId: cached.runId})
           return true
         }
       } catch {

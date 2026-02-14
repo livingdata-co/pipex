@@ -4,8 +4,14 @@ import ora, {type Ora} from 'ora'
 import type {RunContainerResult} from '../engine/types.js'
 import {formatDuration, formatSize} from './utils.js'
 
+/** Reference to a step for display and keying purposes. */
+export type StepRef = {
+  id: string;
+  displayName: string;
+}
+
 /**
- * Events emitted during pipeline execution.
+ * Discriminated union of pipeline execution events.
  *
  * Lifecycle:
  * 1. PIPELINE_START - Pipeline execution begins
@@ -18,29 +24,93 @@ import {formatDuration, formatSize} from './utils.js'
  * 3. PIPELINE_FINISHED - All steps completed successfully
  *    OR PIPELINE_FAILED - Pipeline stopped due to step failure
  */
-export type PipelineEvent =
-  | 'PIPELINE_START'
-  | 'STEP_STARTING'
-  | 'STEP_SKIPPED'
-  | 'STEP_FINISHED'
-  | 'STEP_FAILED'
-  | 'STEP_RETRYING'
-  | 'STEP_WOULD_RUN'
-  | 'PIPELINE_FINISHED'
-  | 'PIPELINE_FAILED'
-
-/** Reference to a step for display and keying purposes. */
-export type StepRef = {
-  id: string;
-  displayName: string;
+export type PipelineStartEvent = {
+  event: 'PIPELINE_START';
+  workspaceId: string;
+  pipelineName: string;
+  jobId?: string;
 }
+
+export type StepStartingEvent = {
+  event: 'STEP_STARTING';
+  workspaceId: string;
+  step: StepRef;
+  jobId?: string;
+}
+
+export type StepSkippedEvent = {
+  event: 'STEP_SKIPPED';
+  workspaceId: string;
+  step: StepRef;
+  runId: string;
+  jobId?: string;
+}
+
+export type StepFinishedEvent = {
+  event: 'STEP_FINISHED';
+  workspaceId: string;
+  step: StepRef;
+  runId?: string;
+  durationMs?: number;
+  artifactSize?: number;
+  ephemeral?: boolean;
+  jobId?: string;
+}
+
+export type StepFailedEvent = {
+  event: 'STEP_FAILED';
+  workspaceId: string;
+  step: StepRef;
+  exitCode: number;
+  jobId?: string;
+}
+
+export type StepRetryingEvent = {
+  event: 'STEP_RETRYING';
+  workspaceId: string;
+  step: StepRef;
+  attempt: number;
+  maxRetries: number;
+  jobId?: string;
+}
+
+export type StepWouldRunEvent = {
+  event: 'STEP_WOULD_RUN';
+  workspaceId: string;
+  step: StepRef;
+  jobId?: string;
+}
+
+export type PipelineFinishedEvent = {
+  event: 'PIPELINE_FINISHED';
+  workspaceId: string;
+  totalArtifactSize: number;
+  jobId?: string;
+}
+
+export type PipelineFailedEvent = {
+  event: 'PIPELINE_FAILED';
+  workspaceId: string;
+  jobId?: string;
+}
+
+export type PipelineEvent =
+  | PipelineStartEvent
+  | StepStartingEvent
+  | StepSkippedEvent
+  | StepFinishedEvent
+  | StepFailedEvent
+  | StepRetryingEvent
+  | StepWouldRunEvent
+  | PipelineFinishedEvent
+  | PipelineFailedEvent
 
 /**
  * Interface for reporting pipeline execution events.
  */
 export type Reporter = {
   /** Reports pipeline and step state transitions */
-  state(workspaceId: string, event: PipelineEvent, step?: StepRef, meta?: Record<string, unknown>): void;
+  emit(event: PipelineEvent): void;
   /** Reports container logs (stdout/stderr) */
   log(workspaceId: string, step: StepRef, stream: 'stdout' | 'stderr', line: string): void;
   /** Reports container execution result */
@@ -54,9 +124,8 @@ export type Reporter = {
 export class ConsoleReporter implements Reporter {
   private readonly logger = pino({level: 'info'})
 
-  state(workspaceId: string, event: PipelineEvent, step?: StepRef, meta?: Record<string, unknown>): void {
-    const stepName = step?.displayName === step?.id ? undefined : step?.displayName
-    this.logger.info({workspaceId, event, stepId: step?.id, stepName, ...meta})
+  emit(event: PipelineEvent): void {
+    this.logger.info(event)
   }
 
   log(workspaceId: string, step: StepRef, stream: 'stdout' | 'stderr', line: string): void {
@@ -86,76 +155,58 @@ export class InteractiveReporter implements Reporter {
     this.verbose = options?.verbose ?? false
   }
 
-  state(workspaceId: string, event: PipelineEvent, step?: StepRef, meta?: Record<string, unknown>): void {
-    switch (event) {
+  emit(event: PipelineEvent): void {
+    switch (event.event) {
       case 'PIPELINE_START': {
-        const displayName = (meta?.pipelineName as string | undefined) ?? workspaceId
+        const displayName = event.pipelineName
         console.log(chalk.bold(`\n▶ Pipeline: ${chalk.cyan(displayName)}\n`))
         break
       }
 
       case 'STEP_STARTING': {
-        if (step) {
-          const spinner = ora({text: step.displayName, prefixText: '  '}).start()
-          this.stepSpinners.set(step.id, spinner)
-        }
-
+        const spinner = ora({text: event.step.displayName, prefixText: '  '}).start()
+        this.stepSpinners.set(event.step.id, spinner)
         break
       }
 
       case 'STEP_SKIPPED': {
-        if (step) {
-          const spinner = this.stepSpinners.get(step.id)
-          if (spinner) {
-            spinner.stopAndPersist({symbol: chalk.gray('⊙'), text: chalk.gray(`${step.displayName} (cached)`)})
-            this.stepSpinners.delete(step.id)
-          } else {
-            console.log(`  ${chalk.gray('⊙')} ${chalk.gray(`${step.displayName} (cached)`)}`)
-          }
+        const spinner = this.stepSpinners.get(event.step.id)
+        if (spinner) {
+          spinner.stopAndPersist({symbol: chalk.gray('⊙'), text: chalk.gray(`${event.step.displayName} (cached)`)})
+          this.stepSpinners.delete(event.step.id)
+        } else {
+          console.log(`  ${chalk.gray('⊙')} ${chalk.gray(`${event.step.displayName} (cached)`)}`)
         }
 
         break
       }
 
       case 'STEP_FINISHED': {
-        if (step) {
-          this.handleStepFinished(step, meta)
-        }
-
+        this.handleStepFinished(event)
         break
       }
 
       case 'STEP_FAILED': {
-        if (step) {
-          this.handleStepFailed(step, meta)
-        }
-
+        this.handleStepFailed(event)
         break
       }
 
       case 'STEP_RETRYING': {
-        if (step) {
-          const attempt = meta?.attempt as number | undefined
-          const maxRetries = meta?.maxRetries as number | undefined
-          const spinner = this.stepSpinners.get(step.id)
-          if (spinner) {
-            spinner.text = `${step.displayName} (retry ${attempt}/${maxRetries})`
-          }
+        const spinner = this.stepSpinners.get(event.step.id)
+        if (spinner) {
+          spinner.text = `${event.step.displayName} (retry ${event.attempt}/${event.maxRetries})`
         }
 
         break
       }
 
       case 'STEP_WOULD_RUN': {
-        if (step) {
-          this.handleStepWouldRun(step)
-        }
-
+        this.handleStepWouldRun(event.step)
         break
       }
 
       case 'PIPELINE_FINISHED': {
-        this.handlePipelineFinished(meta)
+        this.handlePipelineFinished(event)
         break
       }
 
@@ -197,24 +248,24 @@ export class InteractiveReporter implements Reporter {
     // Results shown via state updates
   }
 
-  private handleStepFinished(step: StepRef, meta?: Record<string, unknown>): void {
-    const spinner = this.stepSpinners.get(step.id)
+  private handleStepFinished(event: StepFinishedEvent): void {
+    const spinner = this.stepSpinners.get(event.step.id)
     if (spinner) {
       const details: string[] = []
-      if (typeof meta?.durationMs === 'number') {
-        details.push(formatDuration(meta.durationMs))
+      if (typeof event.durationMs === 'number') {
+        details.push(formatDuration(event.durationMs))
       }
 
-      if (typeof meta?.artifactSize === 'number' && meta.artifactSize > 0) {
-        details.push(formatSize(meta.artifactSize))
+      if (typeof event.artifactSize === 'number' && event.artifactSize > 0) {
+        details.push(formatSize(event.artifactSize))
       }
 
       const suffix = details.length > 0 ? ` (${details.join(', ')})` : ''
-      spinner.stopAndPersist({symbol: chalk.green('✓'), text: chalk.green(`${step.displayName}${suffix}`)})
-      this.stepSpinners.delete(step.id)
+      spinner.stopAndPersist({symbol: chalk.green('✓'), text: chalk.green(`${event.step.displayName}${suffix}`)})
+      this.stepSpinners.delete(event.step.id)
     }
 
-    this.stderrBuffers.delete(step.id)
+    this.stderrBuffers.delete(event.step.id)
   }
 
   private handleStepWouldRun(step: StepRef): void {
@@ -227,28 +278,27 @@ export class InteractiveReporter implements Reporter {
     }
   }
 
-  private handlePipelineFinished(meta?: Record<string, unknown>): void {
+  private handlePipelineFinished(event: PipelineFinishedEvent): void {
     const parts = ['Pipeline completed']
-    if (typeof meta?.totalArtifactSize === 'number' && meta.totalArtifactSize > 0) {
-      parts.push(`(${formatSize(meta.totalArtifactSize)})`)
+    if (event.totalArtifactSize > 0) {
+      parts.push(`(${formatSize(event.totalArtifactSize)})`)
     }
 
     console.log(chalk.bold.green(`\n✓ ${parts.join(' ')}\n`))
   }
 
-  private handleStepFailed(step: StepRef, meta?: Record<string, unknown>): void {
-    const spinner = this.stepSpinners.get(step.id)
-    const exitCode = meta?.exitCode as number | undefined
+  private handleStepFailed(event: StepFailedEvent): void {
+    const spinner = this.stepSpinners.get(event.step.id)
     if (spinner) {
-      const exitInfo = exitCode === undefined ? '' : ` (exit ${exitCode})`
+      const exitInfo = ` (exit ${event.exitCode})`
       spinner.stopAndPersist({
         symbol: chalk.red('✗'),
-        text: chalk.red(`${step.displayName}${exitInfo}`)
+        text: chalk.red(`${event.step.displayName}${exitInfo}`)
       })
-      this.stepSpinners.delete(step.id)
+      this.stepSpinners.delete(event.step.id)
     }
 
-    const stderr = this.stderrBuffers.get(step.id)
+    const stderr = this.stderrBuffers.get(event.step.id)
     if (stderr && stderr.length > 0) {
       console.log(chalk.red('  ── stderr ──'))
       for (const line of stderr) {
@@ -256,6 +306,6 @@ export class InteractiveReporter implements Reporter {
       }
     }
 
-    this.stderrBuffers.delete(step.id)
+    this.stderrBuffers.delete(event.step.id)
   }
 }

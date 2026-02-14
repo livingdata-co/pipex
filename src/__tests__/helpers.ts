@@ -2,7 +2,7 @@ import {execSync} from 'node:child_process'
 import {mkdtemp} from 'node:fs/promises'
 import {tmpdir} from 'node:os'
 import {join} from 'node:path'
-import type {Reporter, StepRef, PipelineEvent} from '../cli/reporter.js'
+import type {Reporter, PipelineEvent} from '../cli/reporter.js'
 
 /**
  * Creates a temporary directory for test isolation.
@@ -16,26 +16,19 @@ export async function createTmpDir(): Promise<string> {
  * Silent reporter — all methods are no-ops.
  */
 export const noopReporter: Reporter = {
-  state() {/* noop */},
+  emit() {/* noop */},
   log() {/* noop */},
   result() {/* noop */}
 }
 
-export type RecordedEvent = {
-  event: PipelineEvent;
-  workspaceId: string;
-  step?: StepRef;
-  meta?: Record<string, unknown>;
-}
-
 /**
- * Returns a reporter that records state() calls for assertions.
+ * Returns a reporter that records emit() calls for assertions.
  */
-export function recordingReporter(): {reporter: Reporter; events: RecordedEvent[]} {
-  const events: RecordedEvent[] = []
+export function recordingReporter(): {reporter: Reporter; events: PipelineEvent[]} {
+  const events: PipelineEvent[] = []
   const reporter: Reporter = {
-    state(workspaceId: string, event: PipelineEvent, step?: StepRef, meta?: Record<string, unknown>) {
-      events.push({event, workspaceId, step, meta})
+    emit(event: PipelineEvent) {
+      events.push(event)
     },
     log() {/* noop */},
     result() {/* noop */}

@@ -6,6 +6,7 @@ import {DockerCliExecutor} from '../../engine/docker-executor.js'
 import {PipelineLoader} from '../pipeline-loader.js'
 import {PipelineRunner} from '../pipeline-runner.js'
 import {Workspace} from '../../engine/workspace.js'
+import type {StepFinishedEvent, StepSkippedEvent, StepStartingEvent} from '../reporter.js'
 import {createTmpDir, isDockerAvailable, noopReporter, recordingReporter} from '../../__tests__/helpers.js'
 
 const hasDocker = isDockerAvailable()
@@ -37,12 +38,12 @@ dockerTest('step B reads step A output via inputs', async t => {
   await new PipelineRunner(new PipelineLoader(), new DockerCliExecutor(), reporter, workdir).run(pipelinePath)
 
   // Both steps should have finished (not just "not crashed")
-  const finished = events.filter(e => e.event === 'STEP_FINISHED')
+  const finished = events.filter((e): e is StepFinishedEvent => e.event === 'STEP_FINISHED')
   t.is(finished.length, 2)
 
   // Verify step B's artifact actually contains step A's output
   const ws = await Workspace.open(workdir, 'dep-test')
-  const bRunId = finished.find(e => e.step?.id === 'b')?.meta?.runId as string
+  const bRunId = finished.find(e => e.step.id === 'b')!.runId!
   t.truthy(bRunId)
   const content = await readFile(join(ws.runArtifactsPath(bRunId), 'copy.txt'), 'utf8')
   t.is(content.trim(), 'data')
@@ -133,7 +134,7 @@ dockerTest('step B executes even when step A fails with allowFailure', async t =
 
   // Step B should have finished successfully
   const finished = events.filter(e => e.event === 'STEP_FINISHED')
-  t.true(finished.some(e => e.step?.id === 'b'))
+  t.true(finished.some(e => e.event === 'STEP_FINISHED' && e.step.id === 'b'))
 })
 
 // -- force specific step -----------------------------------------------------
@@ -160,12 +161,12 @@ dockerTest('force specific step re-executes only that step', async t => {
   const {reporter, events} = recordingReporter()
   await new PipelineRunner(loader, executor, reporter, workdir).run(pipelinePath, {force: ['b']})
 
-  const skipped = events.filter(e => e.event === 'STEP_SKIPPED')
-  const starting = events.filter(e => e.event === 'STEP_STARTING')
+  const skipped = events.filter((e): e is StepSkippedEvent => e.event === 'STEP_SKIPPED')
+  const starting = events.filter((e): e is StepStartingEvent => e.event === 'STEP_STARTING')
   t.is(skipped.length, 1)
-  t.is(skipped[0].step?.id, 'a')
+  t.is(skipped[0].step.id, 'a')
   t.is(starting.length, 1)
-  t.is(starting[0].step?.id, 'b')
+  t.is(starting[0].step.id, 'b')
 })
 
 // -- dry run -----------------------------------------------------------------
