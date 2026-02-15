@@ -122,6 +122,15 @@ export class StepNotFoundError extends PipelineError {
   }
 }
 
+// -- Bundle errors -----------------------------------------------------------
+
+export class BundleError extends PipexError {
+  constructor(message: string, options?: {cause?: unknown}) {
+    super('BUNDLE_ERROR', message, options)
+    this.name = 'BundleError'
+  }
+}
+
 // -- Kit errors --------------------------------------------------------------
 
 export class KitError extends PipexError {

@@ -21,5 +21,6 @@ export type {
 } from './reporter.js'
 export {buildGraph, validateGraph, topologicalLevels, subgraph, leafNodes} from './dag.js'
 export type {StepGraph} from './dag.js'
+export {collectDependencies, buildIgnoreFilter, buildBundle, extractBundle} from './bundle.js'
 export {evaluateCondition} from './condition.js'
 export {dirSize, formatSize, formatDuration} from './utils.js'
