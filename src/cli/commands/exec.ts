@@ -1,4 +1,5 @@
 import process from 'node:process'
+import {randomUUID} from 'node:crypto'
 import {dirname, resolve} from 'node:path'
 import type {Command} from 'commander'
 import {DockerCliExecutor} from '../../engine/docker-executor.js'
@@ -6,7 +7,7 @@ import {Workspace} from '../../engine/workspace.js'
 import {loadStepFile} from '../../core/step-loader.js'
 import {StepRunner} from '../../core/step-runner.js'
 import {StateManager} from '../../core/state.js'
-import {ConsoleReporter} from '../../core/reporter.js'
+import {ConsoleReporter, type JobContext} from '../../core/reporter.js'
 import {InteractiveReporter} from '../interactive-reporter.js'
 import {getGlobalOptions} from '../utils.js'
 
@@ -80,6 +81,7 @@ export function registerExecCommand(program: Command): void {
         }
       }
 
+      const job: JobContext = {workspaceId: workspace.id, jobId: randomUUID()}
       const runner = new StepRunner(runtime, reporter)
       await runner.run({
         workspace,
@@ -88,7 +90,8 @@ export function registerExecCommand(program: Command): void {
         inputs,
         pipelineRoot,
         force: options.force,
-        ephemeral: options.ephemeral
+        ephemeral: options.ephemeral,
+        job
       })
     })
 }

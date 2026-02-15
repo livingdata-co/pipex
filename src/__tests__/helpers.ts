@@ -16,9 +16,7 @@ export async function createTmpDir(): Promise<string> {
  * Silent reporter — all methods are no-ops.
  */
 export const noopReporter: Reporter = {
-  emit() {/* noop */},
-  log() {/* noop */},
-  result() {/* noop */}
+  emit() {/* noop */}
 }
 
 /**
@@ -29,9 +27,7 @@ export function recordingReporter(): {reporter: Reporter; events: PipelineEvent[
   const reporter: Reporter = {
     emit(event: PipelineEvent) {
       events.push(event)
-    },
-    log() {/* noop */},
-    result() {/* noop */}
+    }
   }
 
   return {reporter, events}

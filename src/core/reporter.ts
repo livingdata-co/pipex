@@ -1,10 +1,15 @@
 import pino from 'pino'
-import type {RunContainerResult} from '../engine/types.js'
 
 /** Reference to a step for display and keying purposes. */
 export type StepRef = {
   id: string;
   displayName: string;
+}
+
+/** Common fields identifying an execution session. */
+export type JobContext = {
+  workspaceId: string;
+  jobId: string;
 }
 
 /**
@@ -18,6 +23,7 @@ export type StepRef = {
  *       OR STEP_FAILED - Step failed (pipeline stops unless allowFailure)
  *       OR STEP_SKIPPED - Step skipped due to cache hit
  *       OR STEP_WOULD_RUN - Step would run (dry-run mode)
+ *    c. STEP_LOG - Container log line (stdout/stderr)
  * 3. PIPELINE_FINISHED - All steps completed successfully
  *    OR PIPELINE_FAILED - Pipeline stopped due to step failure
  */
@@ -26,7 +32,7 @@ export type PipelineStartEvent = {
   workspaceId: string;
   pipelineName: string;
   steps: StepRef[];
-  jobId?: string;
+  jobId: string;
   groupId?: string;
 }
 
@@ -34,7 +40,7 @@ export type StepStartingEvent = {
   event: 'STEP_STARTING';
   workspaceId: string;
   step: StepRef;
-  jobId?: string;
+  jobId: string;
   groupId?: string;
 }
 
@@ -44,7 +50,7 @@ export type StepSkippedEvent = {
   step: StepRef;
   runId?: string;
   reason: 'cached' | 'condition' | 'dependency';
-  jobId?: string;
+  jobId: string;
   groupId?: string;
 }
 
@@ -56,7 +62,7 @@ export type StepFinishedEvent = {
   durationMs?: number;
   artifactSize?: number;
   ephemeral?: boolean;
-  jobId?: string;
+  jobId: string;
   groupId?: string;
 }
 
@@ -65,7 +71,7 @@ export type StepFailedEvent = {
   workspaceId: string;
   step: StepRef;
   exitCode: number;
-  jobId?: string;
+  jobId: string;
   groupId?: string;
 }
 
@@ -75,7 +81,7 @@ export type StepRetryingEvent = {
   step: StepRef;
   attempt: number;
   maxRetries: number;
-  jobId?: string;
+  jobId: string;
   groupId?: string;
 }
 
@@ -83,7 +89,7 @@ export type StepWouldRunEvent = {
   event: 'STEP_WOULD_RUN';
   workspaceId: string;
   step: StepRef;
-  jobId?: string;
+  jobId: string;
   groupId?: string;
 }
 
@@ -91,15 +97,25 @@ export type PipelineFinishedEvent = {
   event: 'PIPELINE_FINISHED';
   workspaceId: string;
   totalArtifactSize: number;
-  jobId?: string;
+  jobId: string;
   groupId?: string;
 }
 
 export type PipelineFailedEvent = {
   event: 'PIPELINE_FAILED';
   workspaceId: string;
-  jobId?: string;
+  jobId: string;
   groupId?: string;
+}
+
+export type StepLogEvent = {
+  event: 'STEP_LOG';
+  workspaceId: string;
+  jobId: string;
+  groupId?: string;
+  step: StepRef;
+  stream: 'stdout' | 'stderr';
+  line: string;
 }
 
 export type PipelineEvent =
@@ -112,6 +128,7 @@ export type PipelineEvent =
   | StepWouldRunEvent
   | PipelineFinishedEvent
   | PipelineFailedEvent
+  | StepLogEvent
 
 /**
  * Interface for reporting pipeline execution events.
@@ -119,10 +136,6 @@ export type PipelineEvent =
 export type Reporter = {
   /** Reports pipeline and step state transitions */
   emit(event: PipelineEvent): void;
-  /** Reports container logs (stdout/stderr) */
-  log(workspaceId: string, step: StepRef, stream: 'stdout' | 'stderr', line: string): void;
-  /** Reports container execution result */
-  result(workspaceId: string, step: StepRef, result: RunContainerResult): void;
 }
 
 /**
@@ -134,14 +147,6 @@ export class ConsoleReporter implements Reporter {
 
   emit(event: PipelineEvent): void {
     this.logger.info(event)
-  }
-
-  log(workspaceId: string, step: StepRef, stream: 'stdout' | 'stderr', line: string): void {
-    this.logger.info({workspaceId, stepId: step.id, stream, line})
-  }
-
-  result(workspaceId: string, step: StepRef, result: RunContainerResult): void {
-    this.logger.info({workspaceId, stepId: step.id, result})
   }
 }
 

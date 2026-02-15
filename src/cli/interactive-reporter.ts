@@ -1,8 +1,7 @@
 import process from 'node:process'
 import {createLogUpdate} from 'log-update'
 import chalk from 'chalk'
-import type {RunContainerResult} from '../engine/types.js'
-import type {Reporter, StepRef, PipelineEvent, StepFinishedEvent, StepFailedEvent} from '../core/reporter.js'
+import type {Reporter, PipelineEvent, StepFinishedEvent, StepFailedEvent} from '../core/reporter.js'
 import {formatDuration, formatSize} from '../core/utils.js'
 
 type StepStatus = 'pending' | 'running' | 'done' | 'skipped' | 'failed' | 'would-run'
@@ -121,33 +120,31 @@ export class InteractiveReporter implements Reporter {
         console.error(chalk.bold.red('\n✗ Pipeline failed\n'))
         break
       }
-    }
-  }
 
-  log(_workspaceId: string, step: StepRef, stream: 'stdout' | 'stderr', line: string): void {
-    if (this.verbose) {
-      const prefix = chalk.gray(`  [${step.id}]`)
-      this.logUpdate.clear()
-      console.error(`${prefix} ${line}`)
-      this.render()
-    }
+      case 'STEP_LOG': {
+        if (this.verbose) {
+          const prefix = chalk.gray(`  [${event.step.id}]`)
+          this.logUpdate.clear()
+          console.error(`${prefix} ${event.line}`)
+          this.render()
+        }
 
-    if (stream === 'stderr') {
-      let buffer = this.stderrBuffers.get(step.id)
-      if (!buffer) {
-        buffer = []
-        this.stderrBuffers.set(step.id, buffer)
+        if (event.stream === 'stderr') {
+          let buffer = this.stderrBuffers.get(event.step.id)
+          if (!buffer) {
+            buffer = []
+            this.stderrBuffers.set(event.step.id, buffer)
+          }
+
+          buffer.push(event.line)
+          if (buffer.length > InteractiveReporter.maxStderrLines) {
+            buffer.shift()
+          }
+        }
+
+        break
       }
-
-      buffer.push(line)
-      if (buffer.length > InteractiveReporter.maxStderrLines) {
-        buffer.shift()
-      }
     }
-  }
-
-  result(_workspaceId: string, _step: StepRef, _result: RunContainerResult): void {
-    // Results shown via state updates
   }
 
   private render(): void {

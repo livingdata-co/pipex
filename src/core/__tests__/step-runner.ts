@@ -1,3 +1,4 @@
+import {randomUUID} from 'node:crypto'
 import {readFile} from 'node:fs/promises'
 import {join} from 'node:path'
 import test from 'ava'
@@ -7,6 +8,7 @@ import {ContainerCrashError} from '../../errors.js'
 import {StateManager} from '../state.js'
 import {StepRunner} from '../step-runner.js'
 import type {Step} from '../../types.js'
+import type {JobContext} from '../reporter.js'
 import {createTmpDir, isDockerAvailable, noopReporter, recordingReporter} from '../../__tests__/helpers.js'
 
 const hasDocker = isDockerAvailable()
@@ -22,22 +24,23 @@ function makeStep(overrides: Partial<Step> & {id: string}): Step {
   }
 }
 
-async function setupWorkspace(): Promise<{workspace: Workspace; state: StateManager; tmpDir: string}> {
+async function setupWorkspace(): Promise<{workspace: Workspace; state: StateManager; tmpDir: string; job: JobContext}> {
   const tmpDir = await createTmpDir()
   const workspace = await Workspace.create(tmpDir, 'test-ws')
   const state = new StateManager(workspace.root)
   await state.load()
-  return {workspace, state, tmpDir}
+  const job: JobContext = {workspaceId: workspace.id, jobId: randomUUID()}
+  return {workspace, state, tmpDir, job}
 }
 
 // -- minimal execution -------------------------------------------------------
 
 dockerTest('minimal step writes artifact and returns exitCode 0', async t => {
-  const {workspace, state} = await setupWorkspace()
+  const {workspace, state, job} = await setupWorkspace()
   const runner = new StepRunner(new DockerCliExecutor(), noopReporter)
   const step = makeStep({id: 'greet', cmd: ['sh', '-c', 'echo hello > /output/greeting.txt']})
 
-  const result = await runner.run({workspace, state, step, inputs: new Map(), pipelineRoot: '/'})
+  const result = await runner.run({workspace, state, step, inputs: new Map(), pipelineRoot: '/', job})
 
   t.is(result.exitCode, 0)
   t.truthy(result.runId)
@@ -48,11 +51,11 @@ dockerTest('minimal step writes artifact and returns exitCode 0', async t => {
 })
 
 dockerTest('meta.json exists with correct fields', async t => {
-  const {workspace, state} = await setupWorkspace()
+  const {workspace, state, job} = await setupWorkspace()
   const runner = new StepRunner(new DockerCliExecutor(), noopReporter)
   const step = makeStep({id: 'meta-test', cmd: ['sh', '-c', 'echo ok > /output/out.txt']})
 
-  const result = await runner.run({workspace, state, step, inputs: new Map(), pipelineRoot: '/'})
+  const result = await runner.run({workspace, state, step, inputs: new Map(), pipelineRoot: '/', job})
 
   const metaPath = join(workspace.runPath(result.runId!), 'meta.json')
   const meta = JSON.parse(await readFile(metaPath, 'utf8'))
@@ -65,11 +68,11 @@ dockerTest('meta.json exists with correct fields', async t => {
 // -- log capture -------------------------------------------------------------
 
 dockerTest('stdout and stderr are captured to log files', async t => {
-  const {workspace, state} = await setupWorkspace()
+  const {workspace, state, job} = await setupWorkspace()
   const runner = new StepRunner(new DockerCliExecutor(), noopReporter)
   const step = makeStep({id: 'logs', cmd: ['sh', '-c', 'echo out-line && echo err-line >&2']})
 
-  const result = await runner.run({workspace, state, step, inputs: new Map(), pipelineRoot: '/'})
+  const result = await runner.run({workspace, state, step, inputs: new Map(), pipelineRoot: '/', job})
 
   const stdout = await readFile(join(workspace.runPath(result.runId!), 'stdout.log'), 'utf8')
   const stderr = await readFile(join(workspace.runPath(result.runId!), 'stderr.log'), 'utf8')
@@ -80,13 +83,13 @@ dockerTest('stdout and stderr are captured to log files', async t => {
 // -- cache hit ---------------------------------------------------------------
 
 dockerTest('second run of same step is cached (STEP_SKIPPED)', async t => {
-  const {workspace, state} = await setupWorkspace()
+  const {workspace, state, job} = await setupWorkspace()
   const {reporter, events} = recordingReporter()
   const runner = new StepRunner(new DockerCliExecutor(), reporter)
   const step = makeStep({id: 'cached', cmd: ['sh', '-c', 'echo hi > /output/x.txt']})
 
-  const first = await runner.run({workspace, state, step, inputs: new Map(), pipelineRoot: '/'})
-  const second = await runner.run({workspace, state, step, inputs: new Map(), pipelineRoot: '/'})
+  const first = await runner.run({workspace, state, step, inputs: new Map(), pipelineRoot: '/', job})
+  const second = await runner.run({workspace, state, step, inputs: new Map(), pipelineRoot: '/', job})
 
   t.is(first.runId, second.runId)
   const skipped = events.find(e => e.event === 'STEP_SKIPPED')
@@ -97,12 +100,12 @@ dockerTest('second run of same step is cached (STEP_SKIPPED)', async t => {
 // -- force -------------------------------------------------------------------
 
 dockerTest('force: true produces new runId', async t => {
-  const {workspace, state} = await setupWorkspace()
+  const {workspace, state, job} = await setupWorkspace()
   const runner = new StepRunner(new DockerCliExecutor(), noopReporter)
   const step = makeStep({id: 'force-test', cmd: ['sh', '-c', 'echo data > /output/f.txt']})
 
-  const first = await runner.run({workspace, state, step, inputs: new Map(), pipelineRoot: '/'})
-  const second = await runner.run({workspace, state, step, inputs: new Map(), pipelineRoot: '/', force: true})
+  const first = await runner.run({workspace, state, step, inputs: new Map(), pipelineRoot: '/', job})
+  const second = await runner.run({workspace, state, step, inputs: new Map(), pipelineRoot: '/', force: true, job})
 
   t.not(first.runId, second.runId)
   t.is(second.exitCode, 0)
@@ -111,11 +114,11 @@ dockerTest('force: true produces new runId', async t => {
 // -- ephemeral ---------------------------------------------------------------
 
 dockerTest('ephemeral: true returns exitCode but no runId', async t => {
-  const {workspace, state} = await setupWorkspace()
+  const {workspace, state, job} = await setupWorkspace()
   const runner = new StepRunner(new DockerCliExecutor(), noopReporter)
   const step = makeStep({id: 'ephemeral', cmd: ['sh', '-c', 'echo temp > /output/t.txt']})
 
-  const result = await runner.run({workspace, state, step, inputs: new Map(), pipelineRoot: '/', ephemeral: true})
+  const result = await runner.run({workspace, state, step, inputs: new Map(), pipelineRoot: '/', ephemeral: true, job})
 
   t.is(result.exitCode, 0)
   t.is(result.runId, undefined)
@@ -128,12 +131,12 @@ dockerTest('ephemeral: true returns exitCode but no runId', async t => {
 // -- failure -----------------------------------------------------------------
 
 dockerTest('non-zero exit throws ContainerCrashError', async t => {
-  const {workspace, state} = await setupWorkspace()
+  const {workspace, state, job} = await setupWorkspace()
   const runner = new StepRunner(new DockerCliExecutor(), noopReporter)
   const step = makeStep({id: 'fail', cmd: ['sh', '-c', 'exit 1']})
 
   const error = await t.throwsAsync(
-    async () => runner.run({workspace, state, step, inputs: new Map(), pipelineRoot: '/'})
+    async () => runner.run({workspace, state, step, inputs: new Map(), pipelineRoot: '/', job})
   )
   t.true(error instanceof ContainerCrashError)
 })
@@ -141,11 +144,11 @@ dockerTest('non-zero exit throws ContainerCrashError', async t => {
 // -- allowFailure ------------------------------------------------------------
 
 dockerTest('allowFailure: true commits run with non-zero exitCode', async t => {
-  const {workspace, state} = await setupWorkspace()
+  const {workspace, state, job} = await setupWorkspace()
   const runner = new StepRunner(new DockerCliExecutor(), noopReporter)
   const step = makeStep({id: 'allow-fail', cmd: ['sh', '-c', 'exit 1'], allowFailure: true})
 
-  const result = await runner.run({workspace, state, step, inputs: new Map(), pipelineRoot: '/'})
+  const result = await runner.run({workspace, state, step, inputs: new Map(), pipelineRoot: '/', job})
 
   t.truthy(result.runId)
   t.is(result.exitCode, 1)

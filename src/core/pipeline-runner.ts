@@ -1,4 +1,5 @@
 import process from 'node:process'
+import {randomUUID} from 'node:crypto'
 import {cpus} from 'node:os'
 import {cp, writeFile} from 'node:fs/promises'
 import {setTimeout} from 'node:timers/promises'
@@ -7,7 +8,7 @@ import {dirname, join, resolve} from 'node:path'
 import {Workspace, type ContainerExecutor, type InputMount, type OutputMount, type CacheMount, type BindMount} from '../engine/index.js'
 import {ContainerCrashError, PipexError} from '../errors.js'
 import type {Step} from '../types.js'
-import type {Reporter, StepRef} from './reporter.js'
+import type {Reporter, StepRef, JobContext} from './reporter.js'
 import type {PipelineLoader} from './pipeline-loader.js'
 import {buildGraph, topologicalLevels, subgraph, leafNodes} from './dag.js'
 import {evaluateCondition} from './condition.js'
@@ -56,14 +57,16 @@ export class PipelineRunner {
     const stepRuns = new Map<string, string>()
     let totalArtifactSize = 0
 
+    const job: JobContext = {workspaceId: workspace.id, jobId: randomUUID()}
+
     // Build DAG and determine execution scope
     const graph = buildGraph(config.steps)
     const targets = target ?? leafNodes(graph)
     const activeSteps = subgraph(graph, targets)
 
     this.reporter.emit({
+      ...job,
       event: 'PIPELINE_START',
-      workspaceId: workspace.id,
       pipelineName: config.name ?? config.id,
       steps: config.steps
         .filter(s => activeSteps.has(s.id))
@@ -86,7 +89,7 @@ export class PipelineRunner {
         // Check if blocked by a failed/skipped required dependency
         if (this.isDependencyBlocked(step, failed, skipped)) {
           skipped.add(step.id)
-          this.reporter.emit({event: 'STEP_SKIPPED', workspaceId: workspace.id, step: stepRef, reason: 'dependency'})
+          this.reporter.emit({...job, event: 'STEP_SKIPPED', step: stepRef, reason: 'dependency'})
           return 0
         }
 
@@ -95,7 +98,7 @@ export class PipelineRunner {
           const conditionMet = await evaluateCondition(step.if, {env: process.env})
           if (!conditionMet) {
             skipped.add(step.id)
-            this.reporter.emit({event: 'STEP_SKIPPED', workspaceId: workspace.id, step: stepRef, reason: 'condition'})
+            this.reporter.emit({...job, event: 'STEP_SKIPPED', step: stepRef, reason: 'condition'})
             return 0
           }
         }
@@ -118,19 +121,19 @@ export class PipelineRunner {
 
         // Cache check
         const skipCache = force === true || (Array.isArray(force) && force.includes(step.id))
-        if (!skipCache && await this.tryUseCache({workspace, state, step, stepRef, currentFingerprint, stepRuns})) {
+        if (!skipCache && await this.tryUseCache({workspace, state, step, stepRef, currentFingerprint, stepRuns, job})) {
           return 0
         }
 
         // Dry run
         if (dryRun) {
-          this.reporter.emit({event: 'STEP_WOULD_RUN', workspaceId: workspace.id, step: stepRef})
+          this.reporter.emit({...job, event: 'STEP_WOULD_RUN', step: stepRef})
           return 0
         }
 
         // Execute
-        this.reporter.emit({event: 'STEP_STARTING', workspaceId: workspace.id, step: stepRef})
-        return this.executeStep({workspace, state, step, stepRef, stepRuns, currentFingerprint, resolvedMounts, pipelineRoot})
+        this.reporter.emit({...job, event: 'STEP_STARTING', step: stepRef})
+        return this.executeStep({workspace, state, step, stepRef, stepRuns, currentFingerprint, resolvedMounts, pipelineRoot, job})
       })
 
       const results = await withConcurrency(tasks, maxConcurrency)
@@ -150,13 +153,13 @@ export class PipelineRunner {
     }
 
     if (failed.size > 0) {
-      this.reporter.emit({event: 'PIPELINE_FAILED', workspaceId: workspace.id})
+      this.reporter.emit({...job, event: 'PIPELINE_FAILED'})
       // Re-throw the first failure to signal pipeline failure to the CLI
       const firstFailedId = [...failed][0]
       throw new ContainerCrashError(firstFailedId, 1)
     }
 
-    this.reporter.emit({event: 'PIPELINE_FINISHED', workspaceId: workspace.id, totalArtifactSize})
+    this.reporter.emit({...job, event: 'PIPELINE_FINISHED', totalArtifactSize})
   }
 
   private isDependencyBlocked(step: Step, failed: Set<string>, skippedSteps: Set<string>): boolean {
@@ -167,7 +170,7 @@ export class PipelineRunner {
     return step.inputs.some(input => !input.optional && (failed.has(input.step) || skippedSteps.has(input.step)))
   }
 
-  private async executeStep({workspace, state, step, stepRef, stepRuns, currentFingerprint, resolvedMounts, pipelineRoot}: {
+  private async executeStep({workspace, state, step, stepRef, stepRuns, currentFingerprint, resolvedMounts, pipelineRoot, job}: {
     workspace: Workspace;
     state: StateManager;
     step: Step;
@@ -176,6 +179,7 @@ export class PipelineRunner {
     currentFingerprint: string;
     resolvedMounts?: Array<{hostPath: string; containerPath: string}>;
     pipelineRoot: string;
+    job: JobContext;
   }): Promise<number> {
     const runId = workspace.generateRunId()
     const stagingPath = await workspace.prepareRun(runId)
@@ -225,13 +229,13 @@ export class PipelineRunner {
                 stderrLog.write(line + '\n')
               }
 
-              this.reporter.log(workspace.id, stepRef, stream, line)
+              this.reporter.emit({...job, event: 'STEP_LOG', step: stepRef, stream, line})
             }
           )
           break
         } catch (error) {
           if (error instanceof PipexError && error.transient && attempt < maxRetries) {
-            this.reporter.emit({event: 'STEP_RETRYING', workspaceId: workspace.id, step: stepRef, attempt: attempt + 1, maxRetries})
+            this.reporter.emit({...job, event: 'STEP_RETRYING', step: stepRef, attempt: attempt + 1, maxRetries})
             await setTimeout(retryDelay)
             continue
           }
@@ -239,8 +243,6 @@ export class PipelineRunner {
           throw error
         }
       }
-
-      this.reporter.result(workspace.id, stepRef, result)
 
       await closeStream(stdoutLog)
       await closeStream(stderrLog)
@@ -256,12 +258,12 @@ export class PipelineRunner {
 
         const durationMs = result.finishedAt.getTime() - result.startedAt.getTime()
         const artifactSize = await dirSize(workspace.runArtifactsPath(runId))
-        this.reporter.emit({event: 'STEP_FINISHED', workspaceId: workspace.id, step: stepRef, runId, durationMs, artifactSize})
+        this.reporter.emit({...job, event: 'STEP_FINISHED', step: stepRef, runId, durationMs, artifactSize})
         return artifactSize
       }
 
       await workspace.discardRun(runId)
-      this.reporter.emit({event: 'STEP_FAILED', workspaceId: workspace.id, step: stepRef, exitCode: result.exitCode})
+      this.reporter.emit({...job, event: 'STEP_FAILED', step: stepRef, exitCode: result.exitCode})
       throw new ContainerCrashError(step.id, result.exitCode)
     } catch (error) {
       await closeStream(stdoutLog)
@@ -309,7 +311,8 @@ export class PipelineRunner {
     step,
     stepRef,
     currentFingerprint,
-    stepRuns
+    stepRuns,
+    job
   }: {
     workspace: Workspace;
     state: StateManager;
@@ -317,6 +320,7 @@ export class PipelineRunner {
     stepRef: StepRef;
     currentFingerprint: string;
     stepRuns: Map<string, string>;
+    job: JobContext;
   }): Promise<boolean> {
     const cached = state.getStep(step.id)
     if (cached?.fingerprint === currentFingerprint) {
@@ -325,7 +329,7 @@ export class PipelineRunner {
         if (runs.includes(cached.runId)) {
           stepRuns.set(step.id, cached.runId)
           await workspace.linkRun(step.id, cached.runId)
-          this.reporter.emit({event: 'STEP_SKIPPED', workspaceId: workspace.id, step: stepRef, runId: cached.runId, reason: 'cached'})
+          this.reporter.emit({...job, event: 'STEP_SKIPPED', step: stepRef, runId: cached.runId, reason: 'cached'})
           return true
         }
       } catch {

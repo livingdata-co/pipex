@@ -6,7 +6,7 @@ import {join, resolve} from 'node:path'
 import {type Workspace, type ContainerExecutor, type InputMount, type OutputMount, type CacheMount, type BindMount} from '../engine/index.js'
 import {ContainerCrashError, PipexError} from '../errors.js'
 import type {Step} from '../types.js'
-import type {Reporter, StepRef} from './reporter.js'
+import type {Reporter, StepRef, JobContext} from './reporter.js'
 import {StateManager} from './state.js'
 import {dirSize} from './utils.js'
 
@@ -23,6 +23,7 @@ export type StepRunOptions = {
   pipelineRoot: string;
   force?: boolean;
   ephemeral?: boolean;
+  job: JobContext;
 }
 
 type ExecutionContext = {
@@ -35,6 +36,7 @@ type ExecutionContext = {
   ephemeral?: boolean;
   currentFingerprint: string;
   resolvedMounts?: Array<{hostPath: string; containerPath: string}>;
+  job: JobContext;
 }
 
 /**
@@ -48,7 +50,7 @@ export class StepRunner {
   ) {}
 
   async run(options: StepRunOptions): Promise<StepRunResult> {
-    const {workspace, state, step, inputs, pipelineRoot, force, ephemeral} = options
+    const {workspace, state, step, inputs, pipelineRoot, force, ephemeral, job} = options
     const stepRef: StepRef = {id: step.id, displayName: step.name ?? step.id}
 
     const resolvedMounts = step.mounts?.map(m => ({
@@ -59,14 +61,14 @@ export class StepRunner {
 
     // Cache check (skip for ephemeral or force)
     if (!force && !ephemeral) {
-      const cacheResult = await this.tryUseCache({workspace, state, stepId: step.id, stepRef, fingerprint: currentFingerprint})
+      const cacheResult = await this.tryUseCache({workspace, state, stepId: step.id, stepRef, fingerprint: currentFingerprint, job})
       if (cacheResult) {
         return cacheResult
       }
     }
 
-    this.reporter.emit({event: 'STEP_STARTING', workspaceId: workspace.id, step: stepRef})
-    return this.executeStep({workspace, state, step, stepRef, inputs, pipelineRoot, ephemeral, currentFingerprint, resolvedMounts})
+    this.reporter.emit({...job, event: 'STEP_STARTING', step: stepRef})
+    return this.executeStep({workspace, state, step, stepRef, inputs, pipelineRoot, ephemeral, currentFingerprint, resolvedMounts, job})
   }
 
   private computeFingerprint(
@@ -86,19 +88,20 @@ export class StepRunner {
     })
   }
 
-  private async tryUseCache({workspace, state, stepId, stepRef, fingerprint}: {
+  private async tryUseCache({workspace, state, stepId, stepRef, fingerprint, job}: {
     workspace: Workspace;
     state: StateManager;
     stepId: string;
     stepRef: StepRef;
     fingerprint: string;
+    job: JobContext;
   }): Promise<StepRunResult | undefined> {
     const cached = state.getStep(stepId)
     if (cached?.fingerprint === fingerprint) {
       const runs = await workspace.listRuns()
       if (runs.includes(cached.runId)) {
         await workspace.linkRun(stepId, cached.runId)
-        this.reporter.emit({event: 'STEP_SKIPPED', workspaceId: workspace.id, step: stepRef, runId: cached.runId, reason: 'cached'})
+        this.reporter.emit({...job, event: 'STEP_SKIPPED', step: stepRef, runId: cached.runId, reason: 'cached'})
         return {runId: cached.runId, exitCode: 0}
       }
     }
@@ -107,7 +110,7 @@ export class StepRunner {
   }
 
   private async executeStep(ctx: ExecutionContext): Promise<StepRunResult> {
-    const {workspace, step, stepRef, inputs, pipelineRoot, ephemeral} = ctx
+    const {workspace, step, stepRef, inputs, pipelineRoot, ephemeral, job} = ctx
     const runId = workspace.generateRunId()
     const stagingPath = await workspace.prepareRun(runId)
 
@@ -124,13 +127,12 @@ export class StepRunner {
         ctx, containerInputs, output, caches, mounts, stdoutLog, stderrLog
       })
 
-      this.reporter.result(workspace.id, stepRef, result)
       await closeStream(stdoutLog)
       await closeStream(stderrLog)
 
       if (ephemeral) {
         await workspace.discardRun(runId)
-        this.reporter.emit({event: 'STEP_FINISHED', workspaceId: workspace.id, step: stepRef, ephemeral: true})
+        this.reporter.emit({...job, event: 'STEP_FINISHED', step: stepRef, ephemeral: true})
         return {exitCode: result.exitCode}
       }
 
@@ -195,7 +197,7 @@ export class StepRunner {
     stdoutLog: WriteStream;
     stderrLog: WriteStream;
   }) {
-    const {workspace, step, stepRef, pipelineRoot, ephemeral} = ctx
+    const {workspace, step, stepRef, pipelineRoot, ephemeral, job} = ctx
     const maxRetries = step.retries ?? 0
     const retryDelay = step.retryDelayMs ?? 5000
 
@@ -230,14 +232,14 @@ export class StepRunner {
             if (ephemeral && stream === 'stdout') {
               process.stdout.write(line + '\n')
             } else {
-              this.reporter.log(workspace.id, stepRef, stream, line)
+              this.reporter.emit({...job, event: 'STEP_LOG', step: stepRef, stream, line})
             }
           }
         )
         break
       } catch (error) {
         if (error instanceof PipexError && error.transient && attempt < maxRetries) {
-          this.reporter.emit({event: 'STEP_RETRYING', workspaceId: workspace.id, step: stepRef, attempt: attempt + 1, maxRetries})
+          this.reporter.emit({...job, event: 'STEP_RETRYING', step: stepRef, attempt: attempt + 1, maxRetries})
           await setTimeout(retryDelay)
           continue
         }
@@ -249,7 +251,7 @@ export class StepRunner {
     return result
   }
 
-  private async commitOrDiscard({workspace, state, step, stepRef, inputs, resolvedMounts, currentFingerprint, runId, stagingPath, result}: ExecutionContext & {
+  private async commitOrDiscard({workspace, state, step, stepRef, inputs, resolvedMounts, currentFingerprint, runId, stagingPath, result, job}: ExecutionContext & {
     runId: string;
     stagingPath: string;
     result: {exitCode: number; startedAt: Date; finishedAt: Date};
@@ -286,12 +288,12 @@ export class StepRunner {
 
       const durationMs = result.finishedAt.getTime() - result.startedAt.getTime()
       const artifactSize = await dirSize(workspace.runArtifactsPath(runId))
-      this.reporter.emit({event: 'STEP_FINISHED', workspaceId: workspace.id, step: stepRef, runId, durationMs, artifactSize})
+      this.reporter.emit({...job, event: 'STEP_FINISHED', step: stepRef, runId, durationMs, artifactSize})
       return {runId, exitCode: result.exitCode}
     }
 
     await workspace.discardRun(runId)
-    this.reporter.emit({event: 'STEP_FAILED', workspaceId: workspace.id, step: stepRef, exitCode: result.exitCode})
+    this.reporter.emit({...job, event: 'STEP_FAILED', step: stepRef, exitCode: result.exitCode})
     throw new ContainerCrashError(step.id, result.exitCode)
   }
 }
