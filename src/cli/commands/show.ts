@@ -3,8 +3,9 @@ import {join, resolve} from 'node:path'
 import chalk from 'chalk'
 import type {Command} from 'commander'
 import {Workspace} from '../../engine/workspace.js'
-import {StateManager} from '../state.js'
-import {dirSize, formatSize, getGlobalOptions} from '../utils.js'
+import {StateManager} from '../../core/state.js'
+import {dirSize, formatSize} from '../../core/utils.js'
+import {getGlobalOptions} from '../utils.js'
 
 export function registerShowCommand(program: Command): void {
   program

@@ -1,9 +1,9 @@
 import {resolve} from 'node:path'
 import type {Command} from 'commander'
 import {DockerCliExecutor} from '../../engine/docker-executor.js'
-import {PipelineLoader} from '../pipeline-loader.js'
-import {PipelineRunner} from '../pipeline-runner.js'
-import {ConsoleReporter} from '../reporter.js'
+import {PipelineLoader} from '../../core/pipeline-loader.js'
+import {PipelineRunner} from '../../core/pipeline-runner.js'
+import {ConsoleReporter} from '../../core/reporter.js'
 import {InteractiveReporter} from '../interactive-reporter.js'
 import {getGlobalOptions} from '../utils.js'
 

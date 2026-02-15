@@ -51,6 +51,27 @@ export {
   type OnLogLine
 } from './engine/index.js'
 
+// Export core layer for pipeline orchestration
+export {
+  PipelineRunner,
+  StepRunner,
+  PipelineLoader,
+  StateManager,
+  ConsoleReporter,
+  type Reporter,
+  type StepRef,
+  type PipelineEvent,
+  type StepGraph,
+  buildGraph,
+  topologicalLevels,
+  subgraph,
+  leafNodes,
+  evaluateCondition,
+  dirSize,
+  formatSize,
+  formatDuration
+} from './core/index.js'
+
 export {
   PipexError,
   DockerError,

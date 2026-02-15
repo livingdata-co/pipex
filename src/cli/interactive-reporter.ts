@@ -2,8 +2,8 @@ import process from 'node:process'
 import {createLogUpdate} from 'log-update'
 import chalk from 'chalk'
 import type {RunContainerResult} from '../engine/types.js'
-import type {Reporter, StepRef, PipelineEvent, StepFinishedEvent, StepFailedEvent} from './reporter.js'
-import {formatDuration, formatSize} from './utils.js'
+import type {Reporter, StepRef, PipelineEvent, StepFinishedEvent, StepFailedEvent} from '../core/reporter.js'
+import {formatDuration, formatSize} from '../core/utils.js'
 
 type StepStatus = 'pending' | 'running' | 'done' | 'skipped' | 'failed' | 'would-run'
 
