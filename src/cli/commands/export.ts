@@ -14,7 +14,7 @@ export function registerExportCommand(program: Command): void {
     .argument('<workspace>', 'Workspace name')
     .argument('<step>', 'Step ID')
     .argument('<dest>', 'Destination directory')
-    .action(async (workspaceName: string, stepId: string, dest: string, cmd: Command) => {
+    .action(async (workspaceName: string, stepId: string, dest: string, _options: Record<string, unknown>, cmd: Command) => {
       const {workdir} = getGlobalOptions(cmd)
       const workdirRoot = resolve(workdir)
 

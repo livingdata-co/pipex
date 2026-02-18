@@ -14,7 +14,7 @@ export function registerRmStepCommand(program: Command): void {
     .description('Remove a step\'s run and state entry')
     .argument('<workspace>', 'Workspace name')
     .argument('<step>', 'Step ID')
-    .action(async (workspaceName: string, stepId: string, cmd: Command) => {
+    .action(async (workspaceName: string, stepId: string, _options: Record<string, unknown>, cmd: Command) => {
       const {workdir} = getGlobalOptions(cmd)
       const workdirRoot = resolve(workdir)
 

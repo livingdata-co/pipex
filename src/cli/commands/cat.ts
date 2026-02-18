@@ -14,7 +14,7 @@ export function registerCatCommand(program: Command): void {
     .argument('<workspace>', 'Workspace name')
     .argument('<step>', 'Step ID')
     .argument('[path]', 'Path within artifacts (omit to list)')
-    .action(async (workspaceName: string, stepId: string, artifactPath: string | undefined, cmd: Command) => {
+    .action(async (workspaceName: string, stepId: string, artifactPath: string | undefined, _options: Record<string, unknown>, cmd: Command) => {
       const {workdir} = getGlobalOptions(cmd)
       const workdirRoot = resolve(workdir)
 
