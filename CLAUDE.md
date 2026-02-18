@@ -36,7 +36,7 @@ Two-layer design:
 ### CLI Layer (`src/cli/`) — High-level orchestration
 - **pipeline-runner.ts** — Orchestrates sequential step execution. Computes SHA256 fingerprints (image + cmd + env + sorted inputs + mounts) for cache invalidation. Each step execution produces a **run** with artifacts, captured logs (stdout.log/stderr.log), and structured metadata (meta.json). Mounts previous run artifacts as inputs. Supports `allowFailure` and `force` (skip cache) options.
 - **state.ts** — Persists step fingerprints and run IDs to `state.json` per workspace. Handles cache hit detection and invalidation propagation through dependent steps.
-- **pipeline-loader.ts** — Validates pipeline JSON configs with security checks (no path traversal, relative host mounts only, absolute container paths, alphanumeric IDs).
+- **pipeline-loader.ts** — Validates pipeline JSON configs with security checks (relative host mounts only — `..` allowed but bounded to `process.cwd()` at runtime, absolute container paths, alphanumeric IDs).
 - **reporter.ts** — Two implementations: `ConsoleReporter` (structured JSON via Pino) and `InteractiveReporter` (colored spinners via ora/chalk).
 - **index.ts** — CLI entry point using Commander.js.
 

@@ -2,13 +2,13 @@ import process from 'node:process'
 import {cp, writeFile} from 'node:fs/promises'
 import {setTimeout} from 'node:timers/promises'
 import {createWriteStream, type WriteStream} from 'node:fs'
-import {join, resolve} from 'node:path'
+import {join} from 'node:path'
 import {type Workspace, type ContainerExecutor, type InputMount, type OutputMount, type CacheMount, type BindMount} from '../engine/index.js'
 import {ContainerCrashError, PipexError} from '../errors.js'
 import type {Step} from '../types.js'
 import type {Reporter, StepRef, JobContext} from './reporter.js'
 import {StateManager} from './state.js'
-import {dirSize} from './utils.js'
+import {dirSize, resolveHostPath} from './utils.js'
 
 export type StepRunResult = {
   runId?: string;
@@ -54,7 +54,7 @@ export class StepRunner {
     const stepRef: StepRef = {id: step.id, displayName: step.name ?? step.id}
 
     const resolvedMounts = step.mounts?.map(m => ({
-      hostPath: resolve(pipelineRoot, m.host),
+      hostPath: resolveHostPath(pipelineRoot, m.host),
       containerPath: m.container
     }))
     const currentFingerprint = this.computeFingerprint(step, inputs, resolvedMounts)
@@ -181,7 +181,7 @@ export class StepRunner {
     const output: OutputMount = {stagingRunId: runId, containerPath: step.outputPath ?? '/output'}
     const caches: CacheMount[] | undefined = step.caches?.map(c => ({name: c.name, containerPath: c.path}))
     const mounts: BindMount[] | undefined = step.mounts?.map(m => ({
-      hostPath: resolve(pipelineRoot, m.host),
+      hostPath: resolveHostPath(pipelineRoot, m.host),
       containerPath: m.container
     }))
 
@@ -216,7 +216,7 @@ export class StepRunner {
             caches,
             mounts,
             sources: step.sources?.map(m => ({
-              hostPath: resolve(pipelineRoot, m.host),
+              hostPath: resolveHostPath(pipelineRoot, m.host),
               containerPath: m.container
             })),
             network: step.allowNetwork ? 'bridge' : 'none',

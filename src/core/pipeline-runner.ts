@@ -13,7 +13,7 @@ import type {PipelineLoader} from './pipeline-loader.js'
 import {buildGraph, topologicalLevels, subgraph, leafNodes} from './dag.js'
 import {evaluateCondition} from './condition.js'
 import {StateManager} from './state.js'
-import {dirSize} from './utils.js'
+import {dirSize, resolveHostPath} from './utils.js'
 
 /**
  * Orchestrates pipeline execution with DAG-based parallel execution and caching.
@@ -108,7 +108,7 @@ export class PipelineRunner {
           ?.map(i => stepRuns.get(i.step))
           .filter((id): id is string => id !== undefined)
         const resolvedMounts = step.mounts?.map(m => ({
-          hostPath: resolve(pipelineRoot, m.host),
+          hostPath: resolveHostPath(pipelineRoot, m.host),
           containerPath: m.container
         }))
         const currentFingerprint = StateManager.fingerprint({
@@ -216,7 +216,7 @@ export class PipelineRunner {
               caches,
               mounts,
               sources: step.sources?.map(m => ({
-                hostPath: resolve(pipelineRoot, m.host),
+                hostPath: resolveHostPath(pipelineRoot, m.host),
                 containerPath: m.container
               })),
               network: step.allowNetwork ? 'bridge' : 'none',
@@ -404,7 +404,7 @@ export class PipelineRunner {
     let mounts: BindMount[] | undefined
     if (step.mounts) {
       mounts = step.mounts.map(m => ({
-        hostPath: resolve(pipelineRoot, m.host),
+        hostPath: resolveHostPath(pipelineRoot, m.host),
         containerPath: m.container
       }))
     }

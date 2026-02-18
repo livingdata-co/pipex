@@ -233,14 +233,14 @@ test('parse: validates mount host must be relative', t => {
   }), 'p.json'), {message: /must be a relative path/})
 })
 
-test('parse: validates mount host no ..', t => {
-  t.throws(() => loader.parse(JSON.stringify({
+test('parse: allows mount host with ..', t => {
+  t.notThrows(() => loader.parse(JSON.stringify({
     id: 'p',
     steps: [{
       id: 's', image: 'alpine', cmd: ['echo'],
-      mounts: [{host: '../escape', container: '/c'}]
+      mounts: [{host: '../sibling', container: '/c'}]
     }]
-  }), 'p.json'), {message: /must not contain '\.\.'/})
+  }), 'p.json'))
 })
 
 test('parse: validates mount container must be absolute', t => {

@@ -99,10 +99,6 @@ function validateMounts(stepId: string, mounts: MountSpec[]): void {
       throw new ValidationError(`Step ${stepId}: mount.host '${mount.host}' must be a relative path`)
     }
 
-    if (mount.host.includes('..')) {
-      throw new ValidationError(`Step ${stepId}: mount.host '${mount.host}' must not contain '..'`)
-    }
-
     if (!mount.container || typeof mount.container !== 'string') {
       throw new ValidationError(`Step ${stepId}: mount.container is required and must be a string`)
     }

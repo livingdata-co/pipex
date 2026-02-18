@@ -1,5 +1,7 @@
+import process from 'node:process'
 import {readdir, stat} from 'node:fs/promises'
-import {join} from 'node:path'
+import {join, resolve} from 'node:path'
+import {ValidationError} from '../errors.js'
 
 export async function dirSize(dirPath: string): Promise<number> {
   let total = 0
@@ -19,6 +21,16 @@ export async function dirSize(dirPath: string): Promise<number> {
   }
 
   return total
+}
+
+export function resolveHostPath(pipelineRoot: string, hostRelative: string): string {
+  const resolved = resolve(pipelineRoot, hostRelative)
+  const boundary = process.cwd()
+  if (!resolved.startsWith(boundary + '/') && resolved !== boundary) {
+    throw new ValidationError(`Mount host '${hostRelative}' resolves to '${resolved}' which is outside the working directory '${boundary}'`)
+  }
+
+  return resolved
 }
 
 export function formatSize(bytes: number): string {
