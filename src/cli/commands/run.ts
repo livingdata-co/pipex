@@ -1,3 +1,4 @@
+import process from 'node:process'
 import {resolve} from 'node:path'
 import type {Command} from 'commander'
 import {DockerCliExecutor} from '../../engine/docker-executor.js'
@@ -27,6 +28,16 @@ export function registerRunCommand(program: Command): void {
 
       const reporter = json ? new ConsoleReporter() : new InteractiveReporter({verbose: options.verbose})
       const runner = new PipelineRunner(loader, runtime, reporter, workdirRoot)
+
+      const onSignal = (signal: NodeJS.Signals) => {
+        void (async () => {
+          await runtime.killRunningContainers()
+          process.kill(process.pid, signal)
+        })()
+      }
+
+      process.once('SIGINT', onSignal)
+      process.once('SIGTERM', onSignal)
 
       try {
         const force = options.force === true

@@ -50,6 +50,16 @@ export function registerExecCommand(program: Command): void {
       await runtime.check()
       await runtime.cleanupContainers(workspace.id)
 
+      const onSignal = (signal: NodeJS.Signals) => {
+        void (async () => {
+          await runtime.killRunningContainers()
+          process.kill(process.pid, signal)
+        })()
+      }
+
+      process.once('SIGINT', onSignal)
+      process.once('SIGTERM', onSignal)
+
       // Load state and resolve inputs
       const state = new StateManager(workspace.root)
       await state.load()

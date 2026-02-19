@@ -45,6 +45,12 @@ export abstract class ContainerExecutor {
   abstract cleanupContainers(workspaceId: string): Promise<void>
 
   /**
+   * Force-remove all containers currently being executed by this process.
+   * Called from signal handlers (SIGINT/SIGTERM) to prevent orphaned containers.
+   */
+  abstract killRunningContainers(): Promise<void>
+
+  /**
    * Executes a container with the specified configuration.
    * @param workspace - Workspace for resolving artifact paths
    * @param request - Execution configuration (image, cmd, mounts, env)

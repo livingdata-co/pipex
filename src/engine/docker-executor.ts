@@ -24,12 +24,29 @@ function dockerCliEnv(): Record<string, string> {
 
 export class DockerCliExecutor extends ContainerExecutor {
   private readonly env = dockerCliEnv()
+  private readonly activeContainers = new Set<string>()
 
   async check(): Promise<void> {
     try {
       await execa('docker', ['--version'], {env: this.env})
     } catch (error) {
       throw new DockerNotAvailableError({cause: error})
+    }
+  }
+
+  /**
+   * Force-remove all containers currently being executed by this process.
+   */
+  async killRunningContainers(): Promise<void> {
+    const names = [...this.activeContainers]
+    if (names.length === 0) {
+      return
+    }
+
+    try {
+      await execa('docker', ['rm', '-f', ...names], {env: this.env, reject: false})
+    } catch {
+      // Best effort
     }
   }
 
@@ -96,6 +113,7 @@ export class DockerCliExecutor extends ContainerExecutor {
 
     let exitCode = 0
     let error: string | undefined
+    this.activeContainers.add(request.name)
 
     try {
       await execa('docker', args, {env: this.env})
@@ -143,6 +161,7 @@ export class DockerCliExecutor extends ContainerExecutor {
       exitCode = 1
       error = error_ instanceof Error ? error_.message : String(error_)
     } finally {
+      this.activeContainers.delete(request.name)
       try {
         await execa('docker', ['rm', '-f', '-v', request.name], {env: this.env, reject: false})
       } catch {
