@@ -8,6 +8,7 @@
 | `name`          | string                | Human-readable label (at least one of `id`/`name` required)    |
 | `image`         | string                | Docker image (required for raw steps)                           |
 | `cmd`           | string[]              | Command to execute (required for raw steps)                     |
+| `setup`         | SetupSpec             | Optional setup phase (cmd, caches with `exclusive`, allowNetwork) |
 | `uses`          | string                | Kit name (required for kit steps, mutually exclusive with `image`/`cmd`) |
 | `with`          | object                | Kit parameters                                                  |
 | `inputs`        | InputSpec[]           | Previous steps to mount as read-only at `/input/{stepId}/`      |
@@ -73,7 +74,27 @@ caches:
     path: /tmp/cache
 ```
 
-Caches are workspace-scoped (not global). Common uses: package manager caches, build caches, downloaded assets.
+Caches are workspace-scoped (not global). Common uses: package manager caches, build caches, downloaded assets. Set `exclusive: true` on a cache to acquire an in-memory mutex during the setup phase, preventing concurrent writes from parallel steps.
+
+## Setup Phase
+
+Optional pre-execution phase for dependency installation. Runs before the main `cmd` in the same container.
+
+```yaml
+setup:
+  cmd: [sh, -c, "apt-get update && apt-get install -y curl"]
+  caches:
+    - name: apt-cache
+      path: /var/cache/apt
+      exclusive: true
+  allowNetwork: true
+```
+
+- `cmd`: command to run during setup (required if setup is present)
+- `caches`: caches needed during setup; supports `exclusive: true` for mutex locking
+- `allowNetwork`: enable network during setup even if the run phase is isolated
+
+Built-in kits produce a `setup` phase automatically when `install` is enabled. For kit steps, user-level `setup` merges with kit defaults (user `cmd` overrides, caches merge by name, user `allowNetwork` overrides).
 
 ## Conditional Steps
 
@@ -101,4 +122,4 @@ Workspace ID is determined by (in priority order):
 1. `--workspace` CLI flag
 2. Pipeline `id` (explicit or derived from `name`)
 
-Steps are skipped when their fingerprint (SHA256 of image + cmd + resolved env including `envFile` and `--env-file` + sorted inputs + mounts) hasn't changed since the last successful run. Use `--force` to bypass.
+Steps are skipped when their fingerprint (SHA256 of image + cmd + setup cmd + resolved env including `envFile` and `--env-file` + sorted inputs + mounts) hasn't changed since the last successful run. Use `--force` to bypass.
