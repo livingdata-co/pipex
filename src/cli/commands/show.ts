@@ -17,6 +17,95 @@ function isProcessAlive(pid: number): boolean {
   }
 }
 
+export type StepMeta = {
+  stepName?: string;
+  status: string;
+  durationMs: number;
+  finishedAt: string;
+  artifactBytes: number;
+}
+
+export type ResolvedShowStep = {
+  stepId: string;
+  stepName?: string;
+  status: 'running' | 'success' | 'failure' | 'unknown';
+  durationMs?: number;
+  artifactBytes: number;
+  finishedAt?: string;
+  runId?: string;
+  startedAt?: string;
+}
+
+/**
+ * Resolves the display state of all steps by merging committed state with running markers.
+ * Loads meta from disk via the injected `loadMeta` callback.
+ * Running steps with a live PID override their committed state.
+ * Running steps not yet in committed state are appended.
+ */
+export async function resolveShowSteps(
+  committed: Array<{stepId: string; runId: string}>,
+  running: Array<{stepId: string; startedAt: string; pid: number; stepName?: string}>,
+  loadMeta: (runId: string) => Promise<StepMeta | undefined>,
+  isAlive: (pid: number) => boolean
+): Promise<ResolvedShowStep[]> {
+  const activeRunning = new Map<string, typeof running[number]>()
+  for (const r of running) {
+    if (isAlive(r.pid)) {
+      activeRunning.set(r.stepId, r)
+    }
+  }
+
+  const rows: ResolvedShowStep[] = []
+
+  for (const step of committed) {
+    if (activeRunning.has(step.stepId)) {
+      const r = activeRunning.get(step.stepId)!
+      activeRunning.delete(step.stepId)
+      rows.push({
+        stepId: step.stepId,
+        stepName: r.stepName,
+        status: 'running',
+        artifactBytes: 0,
+        startedAt: r.startedAt
+      })
+      continue
+    }
+
+    const meta = await loadMeta(step.runId)
+    if (meta) {
+      rows.push({
+        stepId: step.stepId,
+        stepName: meta.stepName,
+        status: meta.status as 'success' | 'failure',
+        durationMs: meta.durationMs,
+        artifactBytes: meta.artifactBytes,
+        finishedAt: meta.finishedAt,
+        runId: step.runId
+      })
+    } else {
+      rows.push({
+        stepId: step.stepId,
+        status: 'unknown',
+        artifactBytes: 0,
+        runId: step.runId
+      })
+    }
+  }
+
+  // Append running steps not in committed state
+  for (const [, r] of activeRunning) {
+    rows.push({
+      stepId: r.stepId,
+      stepName: r.stepName,
+      status: 'running',
+      artifactBytes: 0,
+      startedAt: r.startedAt
+    })
+  }
+
+  return rows
+}
+
 export function registerShowCommand(program: Command): void {
   program
     .command('show')
@@ -33,68 +122,43 @@ export function registerShowCommand(program: Command): void {
       const steps = state.listSteps()
       const runningSteps = await workspace.listRunningSteps()
 
-      // Build a map of actively running steps (with live PID)
-      const activeRunning = new Map<string, typeof runningSteps[number]>()
-      for (const running of runningSteps) {
-        if (isProcessAlive(running.pid)) {
-          activeRunning.set(running.stepId, running)
-        }
-      }
-
-      const rows: Array<{stepId: string; stepName?: string; status: string; duration: string; size: string; date: string; runId: string}> = []
-
-      let totalSize = 0
-      for (const {stepId, runId} of steps) {
-        // Running marker overrides committed state (step is being re-executed)
-        if (activeRunning.has(stepId)) {
-          const running = activeRunning.get(stepId)!
-          activeRunning.delete(stepId)
-          const elapsedMs = Date.now() - new Date(running.startedAt).getTime()
-          rows.push({
-            stepId,
-            stepName: running.stepName,
-            status: 'running',
-            duration: formatDuration(elapsedMs),
-            size: '-',
-            date: '-',
-            runId: '-'
-          })
-          continue
-        }
-
+      async function loadMeta(runId: string): Promise<StepMeta | undefined> {
         const metaPath = join(workspace.runPath(runId), 'meta.json')
         try {
           const content = await readFile(metaPath, 'utf8')
           const meta = JSON.parse(content) as Record<string, unknown>
           const artifactBytes = await dirSize(workspace.runArtifactsPath(runId))
-          totalSize += artifactBytes
-          rows.push({
-            stepId,
+          return {
             stepName: meta.stepName as string | undefined,
             status: meta.status as string,
-            duration: formatDuration(meta.durationMs as number),
-            size: formatSize(artifactBytes),
-            date: (meta.finishedAt as string).replace('T', ' ').replace(/\.\d+Z$/, ''),
-            runId
-          })
+            durationMs: meta.durationMs as number,
+            finishedAt: meta.finishedAt as string,
+            artifactBytes
+          }
         } catch {
-          rows.push({stepId, status: 'unknown', duration: '-', size: '-', date: '-', runId})
+          return undefined
         }
       }
 
-      // Add remaining running steps (not in committed state at all)
-      for (const [, running] of activeRunning) {
-        const elapsedMs = Date.now() - new Date(running.startedAt).getTime()
-        rows.push({
-          stepId: running.stepId,
-          stepName: running.stepName,
-          status: 'running',
-          duration: formatDuration(elapsedMs),
-          size: '-',
-          date: '-',
-          runId: '-'
-        })
-      }
+      const resolved = await resolveShowSteps(steps, runningSteps, loadMeta, isProcessAlive)
+
+      const rows = resolved.map(r => ({
+        stepId: r.stepId,
+        stepName: r.stepName,
+        status: r.status,
+        duration: r.durationMs === undefined
+          ? (r.startedAt
+            ? formatDuration(Date.now() - new Date(r.startedAt).getTime())
+            : '-')
+          : formatDuration(r.durationMs),
+        size: r.artifactBytes > 0 ? formatSize(r.artifactBytes) : '-',
+        date: r.finishedAt
+          ? r.finishedAt.replace('T', ' ').replace(/\.\d+Z$/, '')
+          : '-',
+        runId: r.runId ?? '-'
+      }))
+
+      const totalSize = resolved.reduce((sum, r) => sum + r.artifactBytes, 0)
 
       if (rows.length === 0) {
         console.log(chalk.gray('No runs found in this workspace.'))
