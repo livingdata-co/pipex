@@ -33,10 +33,35 @@ export function registerShowCommand(program: Command): void {
       const steps = state.listSteps()
       const runningSteps = await workspace.listRunningSteps()
 
+      // Build a map of actively running steps (with live PID)
+      const activeRunning = new Map<string, typeof runningSteps[number]>()
+      for (const running of runningSteps) {
+        if (isProcessAlive(running.pid)) {
+          activeRunning.set(running.stepId, running)
+        }
+      }
+
       const rows: Array<{stepId: string; stepName?: string; status: string; duration: string; size: string; date: string; runId: string}> = []
 
       let totalSize = 0
       for (const {stepId, runId} of steps) {
+        // Running marker overrides committed state (step is being re-executed)
+        if (activeRunning.has(stepId)) {
+          const running = activeRunning.get(stepId)!
+          activeRunning.delete(stepId)
+          const elapsedMs = Date.now() - new Date(running.startedAt).getTime()
+          rows.push({
+            stepId,
+            stepName: running.stepName,
+            status: 'running',
+            duration: formatDuration(elapsedMs),
+            size: '-',
+            date: '-',
+            runId: '-'
+          })
+          continue
+        }
+
         const metaPath = join(workspace.runPath(runId), 'meta.json')
         try {
           const content = await readFile(metaPath, 'utf8')
@@ -57,17 +82,8 @@ export function registerShowCommand(program: Command): void {
         }
       }
 
-      // Add running steps (not already in committed state)
-      const committedStepIds = new Set(rows.map(r => r.stepId))
-      for (const running of runningSteps) {
-        if (committedStepIds.has(running.stepId)) {
-          continue
-        }
-
-        if (!isProcessAlive(running.pid)) {
-          continue
-        }
-
+      // Add remaining running steps (not in committed state at all)
+      for (const [, running] of activeRunning) {
         const elapsedMs = Date.now() - new Date(running.startedAt).getTime()
         rows.push({
           stepId: running.stepId,
