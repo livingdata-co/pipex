@@ -32,6 +32,7 @@ function resolveKitStep(step: KitStepDefinition, id: string, name: string | unde
     image: kitOutput.image,
     cmd: kitOutput.cmd,
     env: mergeEnv(kitOutput.env, step.env),
+    envFile: step.envFile,
     inputs: step.inputs,
     outputPath: step.outputPath,
     caches: mergeCaches(kitOutput.caches, step.caches),
@@ -58,6 +59,16 @@ export function validateStep(step: Step): void {
 
   if (!Array.isArray(step.cmd) || step.cmd.length === 0) {
     throw new ValidationError(`Invalid step ${step.id}: cmd must be a non-empty array`)
+  }
+
+  if (step.envFile) {
+    if (typeof step.envFile !== 'string') {
+      throw new ValidationError(`Step ${step.id}: envFile must be a string`)
+    }
+
+    if (step.envFile.startsWith('/')) {
+      throw new ValidationError(`Step ${step.id}: envFile '${step.envFile}' must be a relative path`)
+    }
   }
 
   if (step.inputs) {

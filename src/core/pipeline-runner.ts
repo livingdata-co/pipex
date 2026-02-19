@@ -7,6 +7,7 @@ import {createWriteStream, type WriteStream} from 'node:fs'
 import {dirname, join, resolve} from 'node:path'
 import {Workspace, type ContainerExecutor, type InputMount, type OutputMount, type CacheMount, type BindMount} from '../engine/index.js'
 import {ContainerCrashError, PipexError} from '../errors.js'
+import {loadEnvFile} from './env-file.js'
 import type {Step} from '../types.js'
 import type {Reporter, StepRef, JobContext} from './reporter.js'
 import type {PipelineLoader} from './pipeline-loader.js'
@@ -32,8 +33,9 @@ export class PipelineRunner {
     dryRun?: boolean;
     target?: string[];
     concurrency?: number;
+    envFile?: string;
   }): Promise<void> {
-    const {workspace: workspaceName, force, dryRun, target, concurrency} = options ?? {}
+    const {workspace: workspaceName, force, dryRun, target, concurrency, envFile} = options ?? {}
     const config = await this.loader.load(pipelineFilePath)
     const pipelineRoot = dirname(resolve(pipelineFilePath))
 
@@ -51,6 +53,8 @@ export class PipelineRunner {
       await this.runtime.check()
       await this.runtime.cleanupContainers(workspace.id)
     }
+
+    const cliEnv = envFile ? await loadEnvFile(resolve(envFile)) : undefined
 
     const state = new StateManager(workspace.root)
     await state.load()
@@ -103,6 +107,14 @@ export class PipelineRunner {
           }
         }
 
+        // Resolve env vars: CLI envFile < step envFile < step inline env
+        const stepFileEnv = step.envFile
+          ? await loadEnvFile(resolve(pipelineRoot, step.envFile))
+          : undefined
+        const resolvedEnv = (cliEnv ?? stepFileEnv ?? step.env)
+          ? {...cliEnv, ...stepFileEnv, ...step.env}
+          : undefined
+
         // Compute fingerprint
         const inputRunIds = step.inputs
           ?.map(i => stepRuns.get(i.step))
@@ -114,7 +126,7 @@ export class PipelineRunner {
         const currentFingerprint = StateManager.fingerprint({
           image: step.image,
           cmd: step.cmd,
-          env: step.env,
+          env: resolvedEnv,
           inputRunIds,
           mounts: resolvedMounts
         })
@@ -133,7 +145,7 @@ export class PipelineRunner {
 
         // Execute
         this.reporter.emit({...job, event: 'STEP_STARTING', step: stepRef})
-        return this.executeStep({workspace, state, step, stepRef, stepRuns, currentFingerprint, resolvedMounts, pipelineRoot, job})
+        return this.executeStep({workspace, state, step, stepRef, stepRuns, currentFingerprint, resolvedMounts, pipelineRoot, job, resolvedEnv})
       })
 
       const results = await withConcurrency(tasks, maxConcurrency)
@@ -170,7 +182,7 @@ export class PipelineRunner {
     return step.inputs.some(input => !input.optional && (failed.has(input.step) || skippedSteps.has(input.step)))
   }
 
-  private async executeStep({workspace, state, step, stepRef, stepRuns, currentFingerprint, resolvedMounts, pipelineRoot, job}: {
+  private async executeStep({workspace, state, step, stepRef, stepRuns, currentFingerprint, resolvedMounts, pipelineRoot, job, resolvedEnv}: {
     workspace: Workspace;
     state: StateManager;
     step: Step;
@@ -180,6 +192,7 @@ export class PipelineRunner {
     resolvedMounts?: Array<{hostPath: string; containerPath: string}>;
     pipelineRoot: string;
     job: JobContext;
+    resolvedEnv?: Record<string, string>;
   }): Promise<number> {
     const runId = workspace.generateRunId()
     const stagingPath = await workspace.prepareRun(runId)
@@ -210,7 +223,7 @@ export class PipelineRunner {
               name: `pipex-${workspace.id}-${step.id}-${Date.now()}`,
               image: step.image,
               cmd: step.cmd,
-              env: step.env,
+              env: resolvedEnv,
               inputs,
               output,
               caches,
@@ -247,7 +260,7 @@ export class PipelineRunner {
       await closeStream(stdoutLog)
       await closeStream(stderrLog)
 
-      await this.writeRunMeta(stagingPath, {runId, step, stepRuns, resolvedMounts, currentFingerprint, result})
+      await this.writeRunMeta(stagingPath, {runId, step, stepRuns, resolvedMounts, currentFingerprint, result, resolvedEnv})
 
       if (result.exitCode === 0 || step.allowFailure) {
         await workspace.commitRun(runId)
@@ -275,13 +288,14 @@ export class PipelineRunner {
     }
   }
 
-  private async writeRunMeta(stagingPath: string, {runId, step, stepRuns, resolvedMounts, currentFingerprint, result}: {
+  private async writeRunMeta(stagingPath: string, {runId, step, stepRuns, resolvedMounts, currentFingerprint, result, resolvedEnv}: {
     runId: string;
     step: Step;
     stepRuns: Map<string, string>;
     resolvedMounts?: Array<{hostPath: string; containerPath: string}>;
     currentFingerprint: string;
     result: {exitCode: number; startedAt: Date; finishedAt: Date};
+    resolvedEnv?: Record<string, string>;
   }): Promise<void> {
     const meta = {
       runId,
@@ -293,7 +307,7 @@ export class PipelineRunner {
       exitCode: result.exitCode,
       image: step.image,
       cmd: step.cmd,
-      env: step.env,
+      env: resolvedEnv,
       inputs: step.inputs?.map(i => ({
         step: i.step,
         runId: stepRuns.get(i.step),

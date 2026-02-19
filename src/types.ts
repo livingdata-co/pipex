@@ -46,6 +46,8 @@ export type Step = {
   image: string;
   cmd: string[];
   env?: Record<string, string>;
+  /** Path to a dotenv file (relative to the pipeline file). */
+  envFile?: string;
   inputs?: InputSpec[];
   /** Container path for the output artifact (default: "/output"). */
   outputPath?: string;
@@ -92,6 +94,8 @@ export type KitStepDefinition = {
   /** Kit-specific parameters (e.g. { version: "24", script: "build.js" }). */
   with?: Record<string, unknown>;
   env?: Record<string, string>;
+  /** Path to a dotenv file (relative to the pipeline file). */
+  envFile?: string;
   inputs?: InputSpec[];
   outputPath?: string;
   caches?: CacheSpec[];

@@ -18,7 +18,8 @@ export function registerRunCommand(program: Command): void {
     .option('--verbose', 'Stream container logs in real-time (interactive mode)')
     .option('-t, --target <steps>', 'Execute only these steps and their dependencies (comma-separated)')
     .option('-c, --concurrency <number>', 'Max parallel step executions (default: CPU count)', Number)
-    .action(async (pipelineFile: string, options: {workspace?: string; force?: string | boolean; dryRun?: boolean; verbose?: boolean; target?: string; concurrency?: number}, cmd: Command) => {
+    .option('--env-file <path>', 'Load environment variables from a dotenv file for all steps')
+    .action(async (pipelineFile: string, options: {workspace?: string; force?: string | boolean; dryRun?: boolean; verbose?: boolean; target?: string; concurrency?: number; envFile?: string}, cmd: Command) => {
       const {workdir, json} = getGlobalOptions(cmd)
       const workdirRoot = resolve(workdir)
       const loader = new PipelineLoader()
@@ -32,7 +33,7 @@ export function registerRunCommand(program: Command): void {
           ? true
           : (typeof options.force === 'string' ? options.force.split(',') : undefined)
         const target = options.target ? options.target.split(',') : undefined
-        await runner.run(pipelineFile, {workspace: options.workspace, force, dryRun: options.dryRun, target, concurrency: options.concurrency})
+        await runner.run(pipelineFile, {workspace: options.workspace, force, dryRun: options.dryRun, target, concurrency: options.concurrency, envFile: options.envFile})
         if (json) {
           console.log('Pipeline completed')
         }

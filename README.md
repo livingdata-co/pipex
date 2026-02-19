@@ -139,6 +139,7 @@ pipex clean
 | `--dry-run` | | Validate pipeline, compute fingerprints, show what would run without executing |
 | `--target <steps>` | `-t` | Execute only these steps and their dependencies (comma-separated) |
 | `--concurrency <n>` | `-c` | Max parallel step executions (default: CPU count) |
+| `--env-file <path>` | | Load environment variables from a dotenv file for all steps |
 | `--verbose` | | Stream container logs in real-time (interactive mode) |
 
 ### Exec Options
@@ -288,6 +289,7 @@ steps:
 | `with` | object | Kit parameters |
 | `inputs` | InputSpec[] | Previous steps to mount as read-only |
 | `env` | Record<string, string> | Environment variables |
+| `envFile` | string | Path to a dotenv file (relative to pipeline file) |
 | `outputPath` | string | Output mount point (default: `/output`) |
 | `mounts` | MountSpec[] | Host directories to bind mount (read-only) |
 | `sources` | MountSpec[] | Host directories copied into the container's writable layer |
@@ -497,7 +499,7 @@ Workspaces enable caching across runs. The workspace ID is determined by:
 1. CLI flag `--workspace` (highest priority)
 2. Pipeline `id` (explicit or derived from `name`)
 
-**Cache behavior**: Steps are skipped if image, cmd, env, inputs, and mounts haven't changed. See code documentation for details.
+**Cache behavior**: Steps are skipped if image, cmd, env (including values from `envFile` and `--env-file`), inputs, and mounts haven't changed. See code documentation for details.
 
 ## Troubleshooting
 
