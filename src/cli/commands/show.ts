@@ -72,7 +72,7 @@ export function registerShowCommand(program: Command): void {
             stepId,
             stepName: meta.stepName as string | undefined,
             status: meta.status as string,
-            duration: `${meta.durationMs as number}ms`,
+            duration: formatDuration(meta.durationMs as number),
             size: formatSize(artifactBytes),
             date: (meta.finishedAt as string).replace('T', ' ').replace(/\.\d+Z$/, ''),
             runId
