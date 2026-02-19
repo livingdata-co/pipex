@@ -28,12 +28,17 @@ export const pythonKit: Kit = {
     const version = (params.version as string | undefined) ?? '3.12'
     const packageManager = (params.packageManager as string | undefined) ?? 'pip'
     const script = params.script as string | undefined
+    const run = params.run as string | undefined
     const install = (params.install as boolean | undefined) ?? true
     const variant = (params.variant as string | undefined) ?? 'slim'
     const src = params.src as string | undefined
 
-    if (!script || typeof script !== 'string') {
-      throw new MissingParameterError('python', 'script')
+    if (script && run) {
+      throw new KitError('CONFLICTING_PARAMETERS', 'Kit "python": "script" and "run" are mutually exclusive')
+    }
+
+    if (!script && !run) {
+      throw new MissingParameterError('python', 'script" or "run')
     }
 
     const image = `python:${version}-${variant}`
@@ -49,7 +54,7 @@ export const pythonKit: Kit = {
       parts.push(buildInstallCommand(packageManager))
     }
 
-    parts.push(`python /app/${script}`)
+    parts.push(run ?? `python /app/${script!}`)
 
     const output: KitOutput = {
       image,

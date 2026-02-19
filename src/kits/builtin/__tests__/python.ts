@@ -48,7 +48,34 @@ test('resolve throws KitError on unsupported packageManager', t => {
   t.true(error instanceof KitError)
 })
 
-test('resolve throws MissingParameterError without script', t => {
-  const error = t.throws(() => pythonKit.resolve({}), {message: /script.*required/i})
+test('resolve throws MissingParameterError without script or run', t => {
+  const error = t.throws(() => pythonKit.resolve({}), {message: /required/i})
   t.true(error instanceof MissingParameterError)
+})
+
+test('resolve throws KitError when both script and run are provided', t => {
+  const error = t.throws(() => pythonKit.resolve({script: 'app.py', run: 'pytest /app/tests'}), {
+    message: /mutually exclusive/
+  })
+  t.true(error instanceof KitError)
+})
+
+// -- run parameter ------------------------------------------------------------
+
+test('resolve with run uses the command directly', t => {
+  const result = pythonKit.resolve({run: 'pytest /app/tests -v'})
+  t.truthy(result.cmd[2].includes('pytest /app/tests -v'))
+  t.falsy(result.cmd[2].includes('python /app/'))
+})
+
+test('resolve with run still runs install by default', t => {
+  const result = pythonKit.resolve({run: 'pytest /app/tests'})
+  t.truthy(result.cmd[2].includes('pip install'))
+  t.truthy(result.cmd[2].includes('pytest /app/tests'))
+})
+
+test('resolve with run and install=false skips install', t => {
+  const result = pythonKit.resolve({run: 'python --version', install: false})
+  t.falsy(result.cmd[2].includes('pip install'))
+  t.is(result.cmd[2], 'python --version')
 })

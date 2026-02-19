@@ -12,6 +12,7 @@
 | `with`          | object                | Kit parameters                                                  |
 | `inputs`        | InputSpec[]           | Previous steps to mount as read-only at `/input/{stepId}/`      |
 | `env`           | Record<string,string> | Environment variables passed to the container                   |
+| `envFile`       | string                | Path to a dotenv file (relative to pipeline file)               |
 | `outputPath`    | string                | Output mount point (default: `/output`)                         |
 | `mounts`        | MountSpec[]           | Host directories to bind mount read-only                        |
 | `sources`       | MountSpec[]           | Host directories copied into the container's writable layer     |
@@ -22,6 +23,15 @@
 | `retryDelayMs`  | number                | Delay between retries (default: 5000)                           |
 | `allowFailure`  | boolean               | Continue pipeline if step fails                                 |
 | `allowNetwork`  | boolean               | Enable network access in the container                          |
+
+## Environment Variables
+
+Env vars can come from multiple sources. Merge priority (highest wins):
+
+1. Step `env` (inline YAML)
+2. Step `envFile` (per-step dotenv file)
+3. CLI `--env-file` (global, applied to all steps)
+4. Kit defaults
 
 ## Mounts
 
@@ -91,4 +101,4 @@ Workspace ID is determined by (in priority order):
 1. `--workspace` CLI flag
 2. Pipeline `id` (explicit or derived from `name`)
 
-Steps are skipped when their fingerprint (SHA256 of image + cmd + env + sorted inputs + mounts) hasn't changed since the last successful run. Use `--force` to bypass.
+Steps are skipped when their fingerprint (SHA256 of image + cmd + resolved env including `envFile` and `--env-file` + sorted inputs + mounts) hasn't changed since the last successful run. Use `--force` to bypass.

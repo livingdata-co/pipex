@@ -33,12 +33,17 @@ export const nodeKit: Kit = {
     const version = (params.version as string | undefined) ?? '24'
     const packageManager = (params.packageManager as string | undefined) ?? 'npm'
     const script = params.script as string | undefined
+    const run = params.run as string | undefined
     const install = (params.install as boolean | undefined) ?? true
     const variant = (params.variant as string | undefined) ?? 'alpine'
     const src = params.src as string | undefined
 
-    if (!script || typeof script !== 'string') {
-      throw new MissingParameterError('node', 'script')
+    if (script && run) {
+      throw new KitError('CONFLICTING_PARAMETERS', 'Kit "node": "script" and "run" are mutually exclusive')
+    }
+
+    if (!script && !run) {
+      throw new MissingParameterError('node', 'script" or "run')
     }
 
     const image = `node:${version}-${variant}`
@@ -49,7 +54,7 @@ export const nodeKit: Kit = {
       parts.push(buildInstallCommand(packageManager))
     }
 
-    parts.push(`node /app/${script}`)
+    parts.push(run ?? `node /app/${script!}`)
 
     const cache = cacheMap[packageManager]
     if (!cache) {

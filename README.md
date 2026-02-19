@@ -196,43 +196,56 @@ Kits are reusable templates that generate the image, command, caches, and mounts
 ```yaml
 name: my-pipeline
 steps:
-  - id: build
+  - id: transform
     uses: node
-    with: { script: build.js, src: src/app }
+    with: { script: transform.js, src: src/app }
+  - id: convert
+    uses: node
+    with: { run: "node /app/convert.js --format csv --output /output/", src: src/app }
   - id: analyze
     uses: python
     with: { script: analyze.py, src: scripts }
+  - id: enrich
+    uses: python
+    with: { run: "python /app/enrich.py --locale fr --input /input/analyze/", src: scripts/ }
+    inputs: [{ step: analyze }]
   - id: extract
     uses: shell
-    with: { packages: [unzip], run: "unzip /input/build/archive.zip -d /output/" }
-    inputs: [{ step: build }]
+    with: { packages: [unzip], run: "unzip /input/transform/archive.zip -d /output/" }
+    inputs: [{ step: transform }]
 ```
 
 `uses` and `image`/`cmd` are mutually exclusive. All other step fields (`env`, `inputs`, `mounts`, `sources`, `caches`, `timeoutSec`, `allowFailure`, `allowNetwork`) remain available and merge with kit defaults (user values take priority). The `src` parameter in `with` copies the host directory into `/app` in the container's writable layer (see [Sources](#sources)).
 
 #### Available Kits
 
-**`node`** -- Run a Node.js script with automatic dependency installation.
+**`node`** -- Run a Node.js command with automatic dependency installation.
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `script` | *(required)* | Script to run (relative to `/app`) |
+| `script` | -- | Script to run (relative to `/app`). Mutually exclusive with `run`. |
+| `run` | -- | Arbitrary shell command. Mutually exclusive with `script`. |
 | `src` | -- | Host directory to copy into `/app` |
 | `version` | `"24"` | Node.js version |
 | `packageManager` | `"npm"` | `"npm"`, `"pnpm"`, or `"yarn"` |
-| `install` | `true` | Run package install before script |
+| `install` | `true` | Run package install before command |
 | `variant` | `"alpine"` | Image variant |
 
-**`python`** -- Run a Python script with automatic dependency installation from `requirements.txt`.
+Exactly one of `script` or `run` is required. `script: transform.js` is shorthand for `run: node /app/transform.js`. Use `run` to pass arguments or call any command available in the container.
+
+**`python`** -- Run a Python command with automatic dependency installation from `requirements.txt`.
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `script` | *(required)* | Script to run (relative to `/app`) |
+| `script` | -- | Script to run (relative to `/app`). Mutually exclusive with `run`. |
+| `run` | -- | Arbitrary shell command. Mutually exclusive with `script`. |
 | `src` | -- | Host directory to copy into `/app` |
 | `version` | `"3.12"` | Python version |
 | `packageManager` | `"pip"` | `"pip"` or `"uv"` |
-| `install` | `true` | Run dependency install before script |
+| `install` | `true` | Run dependency install before command |
 | `variant` | `"slim"` | Image variant |
+
+Exactly one of `script` or `run` is required. `script: analyze.py` is shorthand for `run: python /app/analyze.py`. Use `run` to pass arguments or call any command available in the container.
 
 **`shell`** -- Run a shell command in a container, with optional apt package installation.
 
