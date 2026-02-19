@@ -1,11 +1,21 @@
+import process from 'node:process'
 import {readFile} from 'node:fs/promises'
 import {join, resolve} from 'node:path'
 import chalk from 'chalk'
 import type {Command} from 'commander'
 import {Workspace} from '../../engine/workspace.js'
 import {StateManager} from '../../core/state.js'
-import {dirSize, formatSize} from '../../core/utils.js'
+import {dirSize, formatDuration, formatSize} from '../../core/utils.js'
 import {getGlobalOptions} from '../utils.js'
+
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch {
+    return false
+  }
+}
 
 export function registerShowCommand(program: Command): void {
   program
@@ -21,11 +31,7 @@ export function registerShowCommand(program: Command): void {
       await state.load()
 
       const steps = state.listSteps()
-
-      if (steps.length === 0) {
-        console.log(chalk.gray('No runs found in this workspace.'))
-        return
-      }
+      const runningSteps = await workspace.listRunningSteps()
 
       const rows: Array<{stepId: string; stepName?: string; status: string; duration: string; size: string; date: string; runId: string}> = []
 
@@ -51,6 +57,34 @@ export function registerShowCommand(program: Command): void {
         }
       }
 
+      // Add running steps (not already in committed state)
+      const committedStepIds = new Set(rows.map(r => r.stepId))
+      for (const running of runningSteps) {
+        if (committedStepIds.has(running.stepId)) {
+          continue
+        }
+
+        if (!isProcessAlive(running.pid)) {
+          continue
+        }
+
+        const elapsedMs = Date.now() - new Date(running.startedAt).getTime()
+        rows.push({
+          stepId: running.stepId,
+          stepName: running.stepName,
+          status: 'running',
+          duration: formatDuration(elapsedMs),
+          size: '-',
+          date: '-',
+          runId: '-'
+        })
+      }
+
+      if (rows.length === 0) {
+        console.log(chalk.gray('No runs found in this workspace.'))
+        return
+      }
+
       if (json) {
         console.log(JSON.stringify(rows, null, 2))
         return
@@ -67,7 +101,10 @@ export function registerShowCommand(program: Command): void {
       ))
       for (const row of rows) {
         const stepLabel = row.stepName ? `${row.stepId} (${row.stepName})` : row.stepId
-        const statusText = row.status === 'success' ? chalk.green(row.status) : chalk.red(row.status)
+        const statusColor = row.status === 'success'
+          ? chalk.green
+          : (row.status === 'running' ? chalk.yellow : chalk.red)
+        const statusText = statusColor(row.status)
         const statusPad = statusWidth + (statusText.length - row.status.length)
         const cols = [
           stepLabel.padEnd(stepWidth),

@@ -1,4 +1,4 @@
-import {access, mkdir, readdir, rename, rm, symlink} from 'node:fs/promises'
+import {access, mkdir, readdir, readFile, rename, rm, symlink, writeFile} from 'node:fs/promises'
 import {randomUUID} from 'node:crypto'
 import {join} from 'node:path'
 import {WorkspaceError, StagingError} from '../errors.js'
@@ -309,6 +309,57 @@ export class Workspace {
     } catch {
       return []
     }
+  }
+
+  /**
+   * Marks a step as currently running by writing a marker file.
+   * @param stepId - Step identifier
+   * @param meta - Metadata about the running step
+   */
+  async markStepRunning(stepId: string, meta: {startedAt: string; pid: number; stepName?: string}): Promise<void> {
+    const dir = join(this.root, 'running')
+    await mkdir(dir, {recursive: true})
+    await writeFile(join(dir, stepId), JSON.stringify(meta), 'utf8')
+  }
+
+  /**
+   * Removes the running marker for a step.
+   * @param stepId - Step identifier
+   */
+  async markStepDone(stepId: string): Promise<void> {
+    await rm(join(this.root, 'running', stepId), {force: true})
+  }
+
+  /**
+   * Lists all steps currently marked as running.
+   * @returns Array of running step metadata
+   */
+  async listRunningSteps(): Promise<Array<{stepId: string; startedAt: string; pid: number; stepName?: string}>> {
+    const dir = join(this.root, 'running')
+    try {
+      const entries = await readdir(dir)
+      const results = []
+      for (const entry of entries) {
+        try {
+          const content = await readFile(join(dir, entry), 'utf8')
+          const meta = JSON.parse(content) as {startedAt: string; pid: number; stepName?: string}
+          results.push({stepId: entry, ...meta})
+        } catch {
+          // Ignore malformed entries
+        }
+      }
+
+      return results
+    } catch {
+      return []
+    }
+  }
+
+  /**
+   * Removes all running markers.
+   */
+  async cleanupRunning(): Promise<void> {
+    await rm(join(this.root, 'running'), {recursive: true, force: true})
   }
 
   /**

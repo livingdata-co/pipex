@@ -49,6 +49,7 @@ export class PipelineRunner {
     }
 
     await workspace.cleanupStaging()
+    await workspace.cleanupRunning()
     if (!dryRun) {
       await this.runtime.check()
       await this.runtime.cleanupContainers(workspace.id)
@@ -196,6 +197,7 @@ export class PipelineRunner {
   }): Promise<number> {
     const runId = workspace.generateRunId()
     const stagingPath = await workspace.prepareRun(runId)
+    await workspace.markStepRunning(step.id, {startedAt: new Date().toISOString(), pid: process.pid, stepName: step.name})
 
     await this.prepareStagingWithInputs(workspace, step, workspace.runStagingArtifactsPath(runId), stepRuns)
 
@@ -285,6 +287,8 @@ export class PipelineRunner {
       await closeStream(stdoutLog)
       await closeStream(stderrLog)
       throw error
+    } finally {
+      await workspace.markStepDone(step.id)
     }
   }
 

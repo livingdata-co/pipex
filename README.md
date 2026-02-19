@@ -113,7 +113,7 @@ pipex clean
 | `run <pipeline>` | Execute a pipeline |
 | `exec <workspace> -f <step-file>` | Execute a single step in a workspace |
 | `cat <workspace> <step> [path]` | Read or list artifact content from a step's latest run |
-| `show <workspace>` | Show steps and runs in a workspace (with artifact sizes) |
+| `show <workspace>` | Show steps and runs in a workspace |
 | `logs <workspace> <step>` | Show stdout/stderr from last run |
 | `inspect <workspace> <step>` | Show run metadata (meta.json) |
 | `export <workspace> <step> <dest>` | Extract artifacts from a step run to the host filesystem |

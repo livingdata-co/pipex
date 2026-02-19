@@ -270,6 +270,76 @@ test('invalid cache name throws WorkspaceError', async t => {
   t.true(error.message.includes('invalid/name'))
 })
 
+// -- running step markers ----------------------------------------------------
+
+test('markStepRunning creates running/{stepId} file', async t => {
+  const root = await createTmpDir()
+  const ws = await Workspace.create(root, 'running-mark')
+  await ws.markStepRunning('build', {startedAt: '2024-01-01T00:00:00Z', pid: 12345})
+
+  const entries = await readdir(join(ws.root, 'running'))
+  t.deepEqual(entries, ['build'])
+})
+
+test('markStepDone removes the running marker', async t => {
+  const root = await createTmpDir()
+  const ws = await Workspace.create(root, 'running-done')
+  await ws.markStepRunning('build', {startedAt: '2024-01-01T00:00:00Z', pid: 12345})
+  await ws.markStepDone('build')
+
+  const entries = await readdir(join(ws.root, 'running'))
+  t.deepEqual(entries, [])
+})
+
+test('markStepDone is no-op for non-existent marker', async t => {
+  const root = await createTmpDir()
+  const ws = await Workspace.create(root, 'running-done-noop')
+  await t.notThrowsAsync(async () => ws.markStepDone('nonexistent'))
+})
+
+test('listRunningSteps returns all running steps with metadata', async t => {
+  const root = await createTmpDir()
+  const ws = await Workspace.create(root, 'running-list')
+  await ws.markStepRunning('build', {startedAt: '2024-01-01T00:00:00Z', pid: 111, stepName: 'Build'})
+  await ws.markStepRunning('test', {startedAt: '2024-01-01T00:01:00Z', pid: 222})
+
+  const running = await ws.listRunningSteps()
+  t.is(running.length, 2)
+
+  const build = running.find(r => r.stepId === 'build')!
+  t.is(build.pid, 111)
+  t.is(build.stepName, 'Build')
+  t.is(build.startedAt, '2024-01-01T00:00:00Z')
+
+  const testStep = running.find(r => r.stepId === 'test')!
+  t.is(testStep.pid, 222)
+  t.is(testStep.stepName, undefined)
+})
+
+test('listRunningSteps returns empty array when no running directory', async t => {
+  const root = await createTmpDir()
+  const ws = await Workspace.create(root, 'running-empty')
+  const running = await ws.listRunningSteps()
+  t.deepEqual(running, [])
+})
+
+test('cleanupRunning removes all running markers', async t => {
+  const root = await createTmpDir()
+  const ws = await Workspace.create(root, 'running-cleanup')
+  await ws.markStepRunning('a', {startedAt: '2024-01-01T00:00:00Z', pid: 1})
+  await ws.markStepRunning('b', {startedAt: '2024-01-01T00:00:00Z', pid: 2})
+
+  await ws.cleanupRunning()
+  const running = await ws.listRunningSteps()
+  t.deepEqual(running, [])
+})
+
+test('cleanupRunning is no-op when no running directory', async t => {
+  const root = await createTmpDir()
+  const ws = await Workspace.create(root, 'running-cleanup-noop')
+  await t.notThrowsAsync(async () => ws.cleanupRunning())
+})
+
 // -- validation --------------------------------------------------------------
 
 test('invalid run ID in runStagingPath throws WorkspaceError', async t => {
