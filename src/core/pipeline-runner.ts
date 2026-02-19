@@ -262,7 +262,10 @@ export class PipelineRunner {
         return artifactSize
       }
 
-      await workspace.discardRun(runId)
+      await workspace.commitRun(runId)
+      await workspace.linkRun(step.id, runId)
+      state.setStep(step.id, runId, '')
+
       this.reporter.emit({...job, event: 'STEP_FAILED', step: stepRef, exitCode: result.exitCode})
       throw new ContainerCrashError(step.id, result.exitCode)
     } catch (error) {
