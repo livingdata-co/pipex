@@ -275,7 +275,7 @@ test('invalid cache name throws WorkspaceError', async t => {
 test('markStepRunning creates running/{stepId} file', async t => {
   const root = await createTmpDir()
   const ws = await Workspace.create(root, 'running-mark')
-  await ws.markStepRunning('build', {startedAt: '2024-01-01T00:00:00Z', pid: 12345})
+  await ws.markStepRunning('build', {startedAt: '2024-01-01T00:00:00Z', pid: 12_345})
 
   const entries = await readdir(join(ws.root, 'running'))
   t.deepEqual(entries, ['build'])
@@ -284,7 +284,7 @@ test('markStepRunning creates running/{stepId} file', async t => {
 test('markStepDone removes the running marker', async t => {
   const root = await createTmpDir()
   const ws = await Workspace.create(root, 'running-done')
-  await ws.markStepRunning('build', {startedAt: '2024-01-01T00:00:00Z', pid: 12345})
+  await ws.markStepRunning('build', {startedAt: '2024-01-01T00:00:00Z', pid: 12_345})
   await ws.markStepDone('build')
 
   const entries = await readdir(join(ws.root, 'running'))

@@ -48,14 +48,6 @@ export const nodeKit: Kit = {
 
     const image = `node:${version}-${variant}`
 
-    const parts: string[] = []
-
-    if (install) {
-      parts.push(buildInstallCommand(packageManager))
-    }
-
-    parts.push(run ?? `node /app/${script!}`)
-
     const cache = cacheMap[packageManager]
     if (!cache) {
       throw new KitError('UNSUPPORTED_PACKAGE_MANAGER', `Kit "node": unsupported packageManager "${packageManager}"`)
@@ -63,9 +55,15 @@ export const nodeKit: Kit = {
 
     const output: KitOutput = {
       image,
-      cmd: ['sh', '-c', parts.join(' && ')],
-      caches: [cache],
-      allowNetwork: true
+      cmd: ['sh', '-c', run ?? `node /app/${script!}`]
+    }
+
+    if (install) {
+      output.setup = {
+        cmd: ['sh', '-c', buildInstallCommand(packageManager)],
+        caches: [{...cache, exclusive: true}],
+        allowNetwork: true
+      }
     }
 
     if (src) {

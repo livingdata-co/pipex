@@ -3,10 +3,11 @@ import {cp, writeFile} from 'node:fs/promises'
 import {setTimeout} from 'node:timers/promises'
 import {createWriteStream, type WriteStream} from 'node:fs'
 import {join} from 'node:path'
-import {type Workspace, type ContainerExecutor, type InputMount, type OutputMount, type CacheMount, type BindMount} from '../engine/index.js'
+import {type Workspace, type ContainerExecutor, type InputMount, type OutputMount, type CacheMount, type BindMount, type SetupPhase} from '../engine/index.js'
 import {ContainerCrashError, PipexError} from '../errors.js'
 import type {Step} from '../types.js'
 import type {Reporter, StepRef, JobContext} from './reporter.js'
+import {CacheLockManager} from './cache-lock.js'
 import {StateManager} from './state.js'
 import {dirSize, resolveHostPath} from './utils.js'
 
@@ -44,6 +45,8 @@ type ExecutionContext = {
  * Adapted from PipelineRunner.executeStep() for standalone use.
  */
 export class StepRunner {
+  private readonly cacheLocks = new CacheLockManager()
+
   constructor(
     private readonly runtime: ContainerExecutor,
     private readonly reporter: Reporter
@@ -82,6 +85,7 @@ export class StepRunner {
     return StateManager.fingerprint({
       image: step.image,
       cmd: step.cmd,
+      setup: step.setup ? {cmd: step.setup.cmd} : undefined,
       env: step.env,
       inputRunIds,
       mounts: resolvedMounts
@@ -119,12 +123,21 @@ export class StepRunner {
 
     const {containerInputs, output, caches, mounts} = this.buildMounts(step, runId, inputs, pipelineRoot)
 
+    // Acquire exclusive locks for setup caches
+    const exclusiveCacheNames = step.setup?.caches
+      ?.filter(c => c.exclusive)
+      .map(c => c.name) ?? []
+    let releaseLocks: (() => void) | undefined
+    if (exclusiveCacheNames.length > 0) {
+      releaseLocks = await this.cacheLocks.acquire(exclusiveCacheNames)
+    }
+
     const stdoutLog = createWriteStream(join(stagingPath, 'stdout.log'))
     const stderrLog = createWriteStream(join(stagingPath, 'stderr.log'))
 
     try {
       const result = await this.executeWithRetries({
-        ctx, containerInputs, output, caches, mounts, stdoutLog, stderrLog
+        ctx, containerInputs, output, caches, mounts, stdoutLog, stderrLog, releaseLocks
       })
 
       await closeStream(stdoutLog)
@@ -141,6 +154,8 @@ export class StepRunner {
       await closeStream(stdoutLog)
       await closeStream(stderrLog)
       throw error
+    } finally {
+      releaseLocks?.()
     }
   }
 
@@ -158,12 +173,16 @@ export class StepRunner {
   }
 
   private async prepareCaches(workspace: Workspace, step: Step): Promise<void> {
-    if (!step.caches) {
-      return
+    if (step.caches) {
+      for (const cache of step.caches) {
+        await workspace.prepareCache(cache.name)
+      }
     }
 
-    for (const cache of step.caches) {
-      await workspace.prepareCache(cache.name)
+    if (step.setup?.caches) {
+      for (const cache of step.setup.caches) {
+        await workspace.prepareCache(cache.name)
+      }
     }
   }
 
@@ -188,7 +207,19 @@ export class StepRunner {
     return {containerInputs, output, caches, mounts}
   }
 
-  private async executeWithRetries({ctx, containerInputs, output, caches, mounts, stdoutLog, stderrLog}: {
+  private buildSetupPhase(step: Step): SetupPhase | undefined {
+    if (!step.setup) {
+      return undefined
+    }
+
+    return {
+      cmd: step.setup.cmd,
+      caches: step.setup.caches?.map(c => ({name: c.name, containerPath: c.path})),
+      allowNetwork: step.setup.allowNetwork
+    }
+  }
+
+  private async executeWithRetries({ctx, containerInputs, output, caches, mounts, stdoutLog, stderrLog, releaseLocks}: {
     ctx: ExecutionContext;
     containerInputs: InputMount[];
     output: OutputMount;
@@ -196,10 +227,12 @@ export class StepRunner {
     mounts: BindMount[] | undefined;
     stdoutLog: WriteStream;
     stderrLog: WriteStream;
+    releaseLocks?: () => void;
   }) {
     const {workspace, step, stepRef, pipelineRoot, ephemeral, job} = ctx
     const maxRetries = step.retries ?? 0
     const retryDelay = step.retryDelayMs ?? 5000
+    const setup = this.buildSetupPhase(step)
 
     let result!: Awaited<ReturnType<ContainerExecutor['run']>>
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -210,6 +243,7 @@ export class StepRunner {
             name: `pipex-${workspace.id}-${step.id}-${Date.now()}`,
             image: step.image,
             cmd: step.cmd,
+            setup,
             env: step.env,
             inputs: containerInputs,
             output,
@@ -234,6 +268,9 @@ export class StepRunner {
             } else {
               this.reporter.emit({...job, event: 'STEP_LOG', step: stepRef, stream, line})
             }
+          },
+          async () => {
+            releaseLocks?.()
           }
         )
         break
@@ -273,6 +310,13 @@ export class StepRunner {
         mountedAs: `/input/${i.step}`
       })),
       mounts: resolvedMounts,
+      setup: step.setup
+        ? {
+          cmd: step.setup.cmd,
+          caches: step.setup.caches?.map(c => c.name),
+          allowNetwork: step.setup.allowNetwork ?? false
+        }
+        : undefined,
       caches: step.caches?.map(c => c.name),
       allowNetwork: step.allowNetwork ?? false,
       fingerprint: currentFingerprint,

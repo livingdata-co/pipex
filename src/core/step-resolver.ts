@@ -1,7 +1,7 @@
 import {ValidationError} from '../errors.js'
 import {getKit} from '../kits/index.js'
 import {isKitStep, type CacheSpec, type KitStepDefinition, type MountSpec, type Step, type StepDefinition} from '../types.js'
-import {slugify, mergeEnv, mergeCaches, mergeMounts} from './pipeline-loader.js'
+import {slugify, mergeEnv, mergeCaches, mergeMounts, mergeSetup} from './pipeline-loader.js'
 
 /**
  * Resolves a step definition into a fully resolved Step.
@@ -31,6 +31,7 @@ function resolveKitStep(step: KitStepDefinition, id: string, name: string | unde
     name,
     image: kitOutput.image,
     cmd: kitOutput.cmd,
+    setup: mergeSetup(kitOutput.setup, step.setup),
     env: mergeEnv(kitOutput.env, step.env),
     envFile: step.envFile,
     inputs: step.inputs,
@@ -87,6 +88,16 @@ export function validateStep(step: Step): void {
 
   if (step.caches) {
     validateCaches(step.id, step.caches)
+  }
+
+  if (step.setup) {
+    if (!Array.isArray(step.setup.cmd) || step.setup.cmd.length === 0) {
+      throw new ValidationError(`Invalid step ${step.id}: setup.cmd must be a non-empty array`)
+    }
+
+    if (step.setup.caches) {
+      validateCaches(step.id, step.setup.caches)
+    }
   }
 }
 

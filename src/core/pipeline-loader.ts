@@ -3,7 +3,7 @@ import {extname} from 'node:path'
 import {deburr} from 'lodash-es'
 import {parse as parseYaml} from 'yaml'
 import {ValidationError} from '../errors.js'
-import type {CacheSpec, MountSpec, Pipeline, PipelineDefinition, Step} from '../types.js'
+import type {CacheSpec, MountSpec, Pipeline, PipelineDefinition, SetupSpec, Step} from '../types.js'
 import {buildGraph, validateGraph} from './dag.js'
 import {resolveStep, validateStep} from './step-resolver.js'
 
@@ -111,4 +111,27 @@ export function mergeMounts(
   }
 
   return [...(kitMounts ?? []), ...(userMounts ?? [])]
+}
+
+export function mergeSetup(
+  kitSetup?: SetupSpec,
+  userSetup?: SetupSpec
+): SetupSpec | undefined {
+  if (!kitSetup && !userSetup) {
+    return undefined
+  }
+
+  if (!kitSetup) {
+    return userSetup
+  }
+
+  if (!userSetup) {
+    return kitSetup
+  }
+
+  return {
+    cmd: userSetup.cmd,
+    caches: mergeCaches(kitSetup.caches, userSetup.caches),
+    allowNetwork: userSetup.allowNetwork ?? kitSetup.allowNetwork
+  }
 }

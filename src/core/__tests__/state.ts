@@ -65,3 +65,15 @@ test('fingerprint changes when env value changes', t => {
   const b = StateManager.fingerprint({...base, env: {A: '2'}})
   t.not(a, b)
 })
+
+test('fingerprint changes when setup.cmd is added', t => {
+  const a = StateManager.fingerprint(base)
+  const b = StateManager.fingerprint({...base, setup: {cmd: ['sh', '-c', 'install']}})
+  t.not(a, b)
+})
+
+test('fingerprint changes when setup.cmd changes', t => {
+  const a = StateManager.fingerprint({...base, setup: {cmd: ['sh', '-c', 'v1']}})
+  const b = StateManager.fingerprint({...base, setup: {cmd: ['sh', '-c', 'v2']}})
+  t.not(a, b)
+})

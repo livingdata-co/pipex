@@ -53,6 +53,19 @@ export type CacheMount = {
 }
 
 /**
+ * Setup phase executed before the main command.
+ * Used for dependency installation with exclusive cache locking and network access.
+ */
+export type SetupPhase = {
+  /** Command and arguments for the setup phase. */
+  cmd: string[];
+  /** Additional caches needed only during setup. */
+  caches?: CacheMount[];
+  /** When true, setup runs with network access (bridge). */
+  allowNetwork?: boolean;
+}
+
+/**
  * Request to execute a container with specified configuration.
  */
 export type RunContainerRequest = {
@@ -62,6 +75,8 @@ export type RunContainerRequest = {
   image: string;
   /** Command and arguments to execute */
   cmd: string[];
+  /** Optional setup phase (runs before cmd with separate caches/network). */
+  setup?: SetupPhase;
   /** Environment variables to pass to the container */
   env?: Record<string, string>;
   /** Input run artifacts to mount as read-only volumes */

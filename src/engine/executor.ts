@@ -55,7 +55,13 @@ export abstract class ContainerExecutor {
    * @param workspace - Workspace for resolving artifact paths
    * @param request - Execution configuration (image, cmd, mounts, env)
    * @param onLogLine - Callback for real-time stdout/stderr logs
+   * @param onSetupComplete - Called after setup phase completes (for releasing cache locks)
    * @returns Execution result with exitCode, timestamps, and optional error
    */
-  abstract run(workspace: Workspace, request: RunContainerRequest, onLogLine: OnLogLine): Promise<RunContainerResult>
+  abstract run(
+    workspace: Workspace,
+    request: RunContainerRequest,
+    onLogLine: OnLogLine,
+    onSetupComplete?: () => Promise<void>,
+  ): Promise<RunContainerResult>
 }

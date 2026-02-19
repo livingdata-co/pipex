@@ -5,13 +5,14 @@ import {cp, writeFile} from 'node:fs/promises'
 import {setTimeout} from 'node:timers/promises'
 import {createWriteStream, type WriteStream} from 'node:fs'
 import {dirname, join, resolve} from 'node:path'
-import {Workspace, type ContainerExecutor, type InputMount, type OutputMount, type CacheMount, type BindMount} from '../engine/index.js'
+import {Workspace, type ContainerExecutor, type InputMount, type OutputMount, type CacheMount, type BindMount, type SetupPhase} from '../engine/index.js'
 import {ContainerCrashError, PipexError} from '../errors.js'
 import {loadEnvFile} from './env-file.js'
 import type {Step} from '../types.js'
 import type {Reporter, StepRef, JobContext} from './reporter.js'
 import type {PipelineLoader} from './pipeline-loader.js'
 import {buildGraph, topologicalLevels, subgraph, leafNodes} from './dag.js'
+import {CacheLockManager} from './cache-lock.js'
 import {evaluateCondition} from './condition.js'
 import {StateManager} from './state.js'
 import {dirSize, resolveHostPath} from './utils.js'
@@ -84,6 +85,7 @@ export class PipelineRunner {
     const stepMap = new Map(config.steps.map(s => [s.id, s]))
     const failed = new Set<string>()
     const skipped = new Set<string>()
+    const cacheLocks = new CacheLockManager()
     const maxConcurrency = concurrency ?? cpus().length
 
     for (const level of levels) {
@@ -127,6 +129,7 @@ export class PipelineRunner {
         const currentFingerprint = StateManager.fingerprint({
           image: step.image,
           cmd: step.cmd,
+          setup: step.setup ? {cmd: step.setup.cmd} : undefined,
           env: resolvedEnv,
           inputRunIds,
           mounts: resolvedMounts
@@ -146,7 +149,7 @@ export class PipelineRunner {
 
         // Execute
         this.reporter.emit({...job, event: 'STEP_STARTING', step: stepRef})
-        return this.executeStep({workspace, state, step, stepRef, stepRuns, currentFingerprint, resolvedMounts, pipelineRoot, job, resolvedEnv})
+        return this.executeStep({workspace, state, step, stepRef, stepRuns, currentFingerprint, resolvedMounts, pipelineRoot, job, resolvedEnv, cacheLocks})
       })
 
       const results = await withConcurrency(tasks, maxConcurrency)
@@ -183,7 +186,7 @@ export class PipelineRunner {
     return step.inputs.some(input => !input.optional && (failed.has(input.step) || skippedSteps.has(input.step)))
   }
 
-  private async executeStep({workspace, state, step, stepRef, stepRuns, currentFingerprint, resolvedMounts, pipelineRoot, job, resolvedEnv}: {
+  private async executeStep({workspace, state, step, stepRef, stepRuns, currentFingerprint, resolvedMounts, pipelineRoot, job, resolvedEnv, cacheLocks}: {
     workspace: Workspace;
     state: StateManager;
     step: Step;
@@ -194,6 +197,7 @@ export class PipelineRunner {
     pipelineRoot: string;
     job: JobContext;
     resolvedEnv?: Record<string, string>;
+    cacheLocks: CacheLockManager;
   }): Promise<number> {
     const runId = workspace.generateRunId()
     const stagingPath = await workspace.prepareRun(runId)
@@ -207,10 +211,32 @@ export class PipelineRunner {
       }
     }
 
+    // Prepare setup caches
+    if (step.setup?.caches) {
+      for (const cache of step.setup.caches) {
+        await workspace.prepareCache(cache.name)
+      }
+    }
+
     const {inputs, output, caches, mounts} = this.buildMounts(step, runId, stepRuns, pipelineRoot)
+    const setup = this.buildSetupPhase(step)
+
+    // Acquire exclusive locks for setup caches
+    const exclusiveCacheNames = step.setup?.caches
+      ?.filter(c => c.exclusive)
+      .map(c => c.name) ?? []
+    let releaseLocks: (() => void) | undefined
+    if (exclusiveCacheNames.length > 0) {
+      releaseLocks = await cacheLocks.acquire(exclusiveCacheNames)
+    }
 
     const stdoutLog = createWriteStream(join(stagingPath, 'stdout.log'))
     const stderrLog = createWriteStream(join(stagingPath, 'stderr.log'))
+
+    const onSetupComplete = async () => {
+      releaseLocks?.()
+      releaseLocks = undefined
+    }
 
     try {
       const maxRetries = step.retries ?? 0
@@ -225,6 +251,7 @@ export class PipelineRunner {
               name: `pipex-${workspace.id}-${step.id}-${Date.now()}`,
               image: step.image,
               cmd: step.cmd,
+              setup,
               env: resolvedEnv,
               inputs,
               output,
@@ -245,7 +272,8 @@ export class PipelineRunner {
               }
 
               this.reporter.emit({...job, event: 'STEP_LOG', step: stepRef, stream, line})
-            }
+            },
+            onSetupComplete
           )
           break
         } catch (error) {
@@ -288,6 +316,7 @@ export class PipelineRunner {
       await closeStream(stderrLog)
       throw error
     } finally {
+      releaseLocks?.()
       await workspace.markStepDone(step.id)
     }
   }
@@ -318,6 +347,13 @@ export class PipelineRunner {
         mountedAs: `/input/${i.step}`
       })),
       mounts: resolvedMounts,
+      setup: step.setup
+        ? {
+          cmd: step.setup.cmd,
+          caches: step.setup.caches?.map(c => c.name),
+          allowNetwork: step.setup.allowNetwork ?? false
+        }
+        : undefined,
       caches: step.caches?.map(c => c.name),
       allowNetwork: step.allowNetwork ?? false,
       fingerprint: currentFingerprint,
@@ -359,6 +395,18 @@ export class PipelineRunner {
     }
 
     return false
+  }
+
+  private buildSetupPhase(step: Step): SetupPhase | undefined {
+    if (!step.setup) {
+      return undefined
+    }
+
+    return {
+      cmd: step.setup.cmd,
+      caches: step.setup.caches?.map(c => ({name: c.name, containerPath: c.path})),
+      allowNetwork: step.setup.allowNetwork
+    }
   }
 
   private async prepareStagingWithInputs(

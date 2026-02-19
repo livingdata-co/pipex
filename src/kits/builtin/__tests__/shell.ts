@@ -20,6 +20,11 @@ test('resolve without packages has no network', t => {
   t.is(result.allowNetwork, undefined)
 })
 
+test('resolve without packages has no setup', t => {
+  const result = shellKit.resolve({run: 'ls'})
+  t.is(result.setup, undefined)
+})
+
 // -- With packages ------------------------------------------------------------
 
 test('resolve with packages defaults to debian', t => {
@@ -27,34 +32,45 @@ test('resolve with packages defaults to debian', t => {
   t.is(result.image, 'debian:bookworm-slim')
 })
 
-test('resolve with packages prepends apt-get install', t => {
+test('resolve with packages puts apt-get in setup.cmd', t => {
   const result = shellKit.resolve({run: 'unzip archive.zip', packages: ['unzip', 'jq']})
-  t.truthy(result.cmd[2].includes('apt-get update'))
-  t.truthy(result.cmd[2].includes('apt-get install -y --no-install-recommends unzip jq'))
-  t.truthy(result.cmd[2].includes('unzip archive.zip'))
+  t.truthy(result.setup)
+  t.truthy(result.setup!.cmd[2].includes('apt-get update'))
+  t.truthy(result.setup!.cmd[2].includes('apt-get install -y --no-install-recommends unzip jq'))
 })
 
-test('resolve with packages cleans apt lists', t => {
+test('resolve with packages cleans apt lists in setup', t => {
   const result = shellKit.resolve({run: 'ls', packages: ['curl']})
-  t.truthy(result.cmd[2].includes('rm -rf /var/lib/apt/lists/*'))
+  t.truthy(result.setup!.cmd[2].includes('rm -rf /var/lib/apt/lists/*'))
 })
 
-test('resolve with packages includes apt-cache', t => {
-  const result = shellKit.resolve({run: 'ls', packages: ['curl']})
-  t.deepEqual(result.caches, [{name: 'apt-cache', path: '/var/cache/apt'}])
+test('resolve with packages has run cmd as just the user command', t => {
+  const result = shellKit.resolve({run: 'my-command', packages: ['curl']})
+  t.deepEqual(result.cmd, ['sh', '-c', 'my-command'])
 })
 
-test('resolve with packages enables network', t => {
+test('resolve with packages includes apt-cache in setup.caches with exclusive', t => {
   const result = shellKit.resolve({run: 'ls', packages: ['curl']})
-  t.true(result.allowNetwork)
+  t.deepEqual(result.setup!.caches, [{name: 'apt-cache', path: '/var/cache/apt', exclusive: true}])
+})
+
+test('resolve with packages enables network on setup', t => {
+  const result = shellKit.resolve({run: 'ls', packages: ['curl']})
+  t.true(result.setup!.allowNetwork)
+})
+
+test('resolve with packages has no top-level caches or allowNetwork', t => {
+  const result = shellKit.resolve({run: 'ls', packages: ['curl']})
+  t.is(result.caches, undefined)
+  t.is(result.allowNetwork, undefined)
 })
 
 test('resolve with empty packages array behaves like no packages', t => {
   const result = shellKit.resolve({run: 'ls', packages: []})
   t.is(result.image, 'alpine:3.20')
+  t.is(result.setup, undefined)
   t.is(result.caches, undefined)
   t.is(result.allowNetwork, undefined)
-  t.falsy(result.cmd[2].includes('apt-get'))
 })
 
 // -- Custom image -------------------------------------------------------------

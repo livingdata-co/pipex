@@ -256,7 +256,7 @@ Exactly one of `script` or `run` is required. `script: analyze.py` is shorthand 
 | `src` | -- | Host directory to mount read-only at `/app` |
 | `image` | `"alpine:3.20"` | Docker image (defaults to `"debian:bookworm-slim"` when `packages` is set) |
 
-When `packages` is provided, the kit automatically switches to a Debian image, enables network access, and provides an `apt-cache` cache. Without packages, it runs on a minimal Alpine image with no network.
+When `packages` is provided, the kit switches to a Debian image and installs packages in a setup phase (with network access and an exclusive `apt-cache` cache). The user command runs in the isolated run phase. Without packages, it runs on a minimal Alpine image with no network and no setup phase.
 
 ```yaml
 # Simple command (alpine, no network)
@@ -298,6 +298,7 @@ steps:
 | `name` | string | Human-readable display name |
 | `image` | string | Docker image (required for raw steps) |
 | `cmd` | string[] | Command to execute (required for raw steps) |
+| `setup` | SetupSpec | Optional setup phase (see [Setup Phase](#setup-phase)) |
 | `uses` | string | Kit name (required for kit steps) |
 | `with` | object | Kit parameters |
 | `inputs` | InputSpec[] | Previous steps to mount as read-only |
@@ -442,6 +443,30 @@ Common use cases:
 
 **Note**: Caches are workspace-scoped (not global). Different workspaces have isolated caches.
 
+### Setup Phase
+
+Steps can define an optional `setup` phase that runs before the main command. This is used by kits to isolate dependency installation from execution, enabling safe parallel runs with shared caches.
+
+```yaml
+setup:
+  cmd: [sh, -c, "apt-get update && apt-get install -y curl"]
+  caches:
+    - name: apt-cache
+      path: /var/cache/apt
+      exclusive: true
+  allowNetwork: true
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `cmd` | string[] | Command to execute during setup |
+| `caches` | CacheSpec[] | Caches needed during setup (supports `exclusive`) |
+| `allowNetwork` | boolean | Enable network access during setup |
+
+When `exclusive: true` is set on a setup cache, an in-memory mutex ensures only one step at a time can write to that cache. After setup completes, the lock is released and the run phase executes without holding any locks.
+
+Built-in kits use this automatically: when `install` is enabled (the default), the install command runs in a setup phase with exclusive cache access and network, while the user command runs in the parallel-safe run phase.
+
 ## Examples
 
 ### Geodata Processing
@@ -512,7 +537,7 @@ Workspaces enable caching across runs. The workspace ID is determined by:
 1. CLI flag `--workspace` (highest priority)
 2. Pipeline `id` (explicit or derived from `name`)
 
-**Cache behavior**: Steps are skipped if image, cmd, env (including values from `envFile` and `--env-file`), inputs, and mounts haven't changed. See code documentation for details.
+**Cache behavior**: Steps are skipped if image, cmd, setup cmd, env (including values from `envFile` and `--env-file`), inputs, and mounts haven't changed. See code documentation for details.
 
 ## Troubleshooting
 

@@ -48,19 +48,17 @@ export const pythonKit: Kit = {
       throw new KitError('UNSUPPORTED_PACKAGE_MANAGER', `Kit "python": unsupported packageManager "${packageManager}"`)
     }
 
-    const parts: string[] = []
-
-    if (install) {
-      parts.push(buildInstallCommand(packageManager))
-    }
-
-    parts.push(run ?? `python /app/${script!}`)
-
     const output: KitOutput = {
       image,
-      cmd: ['sh', '-c', parts.join(' && ')],
-      caches: [cache],
-      allowNetwork: true
+      cmd: ['sh', '-c', run ?? `python /app/${script!}`]
+    }
+
+    if (install) {
+      output.setup = {
+        cmd: ['sh', '-c', buildInstallCommand(packageManager)],
+        caches: [{...cache, exclusive: true}],
+        allowNetwork: true
+      }
     }
 
     if (src) {

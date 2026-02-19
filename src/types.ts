@@ -31,6 +31,18 @@ export type CacheSpec = {
   name: string;
   /** Absolute mount path inside the container. */
   path: string;
+  /** When true, the cache is locked exclusively during the setup phase. */
+  exclusive?: boolean;
+}
+
+/** Optional setup phase executed before the main command (e.g. dependency install). */
+export type SetupSpec = {
+  /** Command and arguments for the setup phase. */
+  cmd: string[];
+  /** Caches used during setup (e.g. package manager stores). */
+  caches?: CacheSpec[];
+  /** When true, setup gets network access even if the run phase is isolated. */
+  allowNetwork?: boolean;
 }
 
 // -- Resolved types (after kit resolution) ----------------------------------
@@ -45,6 +57,8 @@ export type Step = {
   name?: string;
   image: string;
   cmd: string[];
+  /** Optional setup phase (dependency install) before the main command. */
+  setup?: SetupSpec;
   env?: Record<string, string>;
   /** Path to a dotenv file (relative to the pipeline file). */
   envFile?: string;
@@ -93,6 +107,8 @@ export type KitStepDefinition = {
   uses: string;
   /** Kit-specific parameters (e.g. { version: "24", script: "build.js" }). */
   with?: Record<string, unknown>;
+  /** Optional setup phase override (merged with kit defaults). */
+  setup?: SetupSpec;
   env?: Record<string, string>;
   /** Path to a dotenv file (relative to the pipeline file). */
   envFile?: string;

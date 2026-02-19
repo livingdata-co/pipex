@@ -6,7 +6,8 @@ import {
   parsePipelineFile,
   mergeEnv,
   mergeCaches,
-  mergeMounts
+  mergeMounts,
+  mergeSetup
 } from '../pipeline-loader.js'
 
 // ---------------------------------------------------------------------------
@@ -330,4 +331,94 @@ test('parse: valid DAG diamond → OK', t => {
       {id: 'd', image: 'alpine', cmd: ['echo'], inputs: [{step: 'b'}, {step: 'c'}]}
     ]
   }), 'p.json'))
+})
+
+// ---------------------------------------------------------------------------
+// mergeSetup
+// ---------------------------------------------------------------------------
+
+test('mergeSetup returns undefined when both are undefined', t => {
+  t.is(mergeSetup(undefined, undefined), undefined)
+})
+
+test('mergeSetup returns kit setup when user is undefined', t => {
+  const kit = {cmd: ['sh', '-c', 'install'], allowNetwork: true}
+  t.deepEqual(mergeSetup(kit, undefined), kit)
+})
+
+test('mergeSetup returns user setup when kit is undefined', t => {
+  const user = {cmd: ['sh', '-c', 'my-install'], allowNetwork: false}
+  t.deepEqual(mergeSetup(undefined, user), user)
+})
+
+test('mergeSetup user cmd overrides kit cmd', t => {
+  const kit = {cmd: ['sh', '-c', 'kit-install'], caches: [{name: 'c', path: '/c'}]}
+  const user = {cmd: ['sh', '-c', 'user-install']}
+  const result = mergeSetup(kit, user)!
+  t.deepEqual(result.cmd, ['sh', '-c', 'user-install'])
+})
+
+test('mergeSetup merges caches (user wins by name)', t => {
+  const kit = {cmd: ['sh', '-c', 'a'], caches: [{name: 'x', path: '/kit'}]}
+  const user = {cmd: ['sh', '-c', 'b'], caches: [{name: 'x', path: '/user'}]}
+  const result = mergeSetup(kit, user)!
+  t.deepEqual(result.caches, [{name: 'x', path: '/user'}])
+})
+
+test('mergeSetup user allowNetwork overrides kit', t => {
+  const kit = {cmd: ['sh', '-c', 'a'], allowNetwork: true}
+  const user = {cmd: ['sh', '-c', 'b'], allowNetwork: false}
+  const result = mergeSetup(kit, user)!
+  t.false(result.allowNetwork)
+})
+
+test('mergeSetup falls back to kit allowNetwork when user omits it', t => {
+  const kit = {cmd: ['sh', '-c', 'a'], allowNetwork: true}
+  const user = {cmd: ['sh', '-c', 'b']}
+  const result = mergeSetup(kit, user)!
+  t.true(result.allowNetwork)
+})
+
+// ---------------------------------------------------------------------------
+// Setup validation
+// ---------------------------------------------------------------------------
+
+test('parse: step with valid setup passes validation', t => {
+  t.notThrows(() => loader.parse(JSON.stringify({
+    id: 'p',
+    steps: [{
+      id: 's', image: 'alpine', cmd: ['echo'],
+      setup: {cmd: ['sh', '-c', 'install'], caches: [{name: 'apt', path: '/var/cache/apt'}]}
+    }]
+  }), 'p.json'))
+})
+
+test('parse: setup with empty cmd throws ValidationError', t => {
+  t.throws(() => loader.parse(JSON.stringify({
+    id: 'p',
+    steps: [{
+      id: 's', image: 'alpine', cmd: ['echo'],
+      setup: {cmd: []}
+    }]
+  }), 'p.json'), {message: /setup\.cmd must be a non-empty array/})
+})
+
+test('parse: setup with invalid cache name throws ValidationError', t => {
+  t.throws(() => loader.parse(JSON.stringify({
+    id: 'p',
+    steps: [{
+      id: 's', image: 'alpine', cmd: ['echo'],
+      setup: {cmd: ['sh'], caches: [{name: 'bad name!', path: '/cache'}]}
+    }]
+  }), 'p.json'), {message: /must contain only alphanumeric/})
+})
+
+test('parse: setup with relative cache path throws ValidationError', t => {
+  t.throws(() => loader.parse(JSON.stringify({
+    id: 'p',
+    steps: [{
+      id: 's', image: 'alpine', cmd: ['echo'],
+      setup: {cmd: ['sh'], caches: [{name: 'c', path: 'relative'}]}
+    }]
+  }), 'p.json'), {message: /must be an absolute path/})
 })

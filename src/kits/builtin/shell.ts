@@ -16,22 +16,17 @@ export const shellKit: Kit = {
     const defaultImage = hasPackages ? 'debian:bookworm-slim' : 'alpine:3.20'
     const image = (params.image as string | undefined) ?? defaultImage
 
-    const parts: string[] = []
-
-    if (hasPackages) {
-      parts.push(`apt-get update && apt-get install -y --no-install-recommends ${packages.join(' ')} && rm -rf /var/lib/apt/lists/*`)
-    }
-
-    parts.push(run)
-
     const output: KitOutput = {
       image,
-      cmd: ['sh', '-c', parts.join(' && ')]
+      cmd: ['sh', '-c', run]
     }
 
     if (hasPackages) {
-      output.caches = [{name: 'apt-cache', path: '/var/cache/apt'}]
-      output.allowNetwork = true
+      output.setup = {
+        cmd: ['sh', '-c', `apt-get update && apt-get install -y --no-install-recommends ${packages.join(' ')} && rm -rf /var/lib/apt/lists/*`],
+        caches: [{name: 'apt-cache', path: '/var/cache/apt', exclusive: true}],
+        allowNetwork: true
+      }
     }
 
     if (src) {

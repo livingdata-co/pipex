@@ -48,6 +48,7 @@ export class StateManager {
   static fingerprint(config: {
     image: string;
     cmd: string[];
+    setup?: {cmd: string[]};
     env?: Record<string, string>;
     inputRunIds?: string[];
     mounts?: Array<{hostPath: string; containerPath: string}>;
@@ -55,6 +56,10 @@ export class StateManager {
     const hash = createHash('sha256')
     hash.update(config.image)
     hash.update(JSON.stringify(config.cmd))
+    if (config.setup) {
+      hash.update(JSON.stringify(config.setup.cmd))
+    }
+
     if (config.env) {
       hash.update(JSON.stringify(Object.entries(config.env).sort((a, b) => a[0].localeCompare(b[0]))))
     }

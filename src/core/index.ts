@@ -30,4 +30,5 @@ export {buildGraph, validateGraph, topologicalLevels, subgraph, leafNodes} from 
 export type {StepGraph} from './dag.js'
 export {collectDependencies, buildIgnoreFilter, buildBundle, extractBundle} from './bundle.js'
 export {evaluateCondition} from './condition.js'
+export {CacheLockManager} from './cache-lock.js'
 export {dirSize, formatSize, formatDuration} from './utils.js'
