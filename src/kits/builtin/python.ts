@@ -9,7 +9,7 @@ const cacheMap: Record<string, {name: string; path: string}> = {
 function buildInstallCommand(packageManager: string): string {
   switch (packageManager) {
     case 'pip': {
-      return 'pip install --quiet -r /app/requirements.txt 2>&1'
+      return 'pip install --quiet --root-user-action=ignore -r /app/requirements.txt 2>&1'
     }
 
     case 'uv': {
