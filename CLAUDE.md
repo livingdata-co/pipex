@@ -9,7 +9,7 @@ Pipex is a containerized pipeline execution engine that runs multi-step pipeline
 ## Commands
 
 ```bash
-pipex run <pipeline.yaml>                               # Run pipeline (published binary)
+pipex run [pipeline]                                    # Run pipeline (file, directory, or cwd)
 pipex show <workspace>                                  # Show steps and runs in a workspace
 pipex logs <workspace> <step>                           # Show logs from last run of a step
 pipex inspect <workspace> <step>                        # Show run metadata
@@ -17,7 +17,7 @@ pipex prune <workspace>                                 # Remove old runs, keep 
 pipex list                                             # List workspaces
 pipex rm <workspace>                                   # Remove workspace
 pipex clean                                            # Remove all workspaces
-npm run cli -- run <pipeline.yaml>                     # Run pipeline (dev mode via tsx)
+npm run cli -- run [pipeline]                          # Run pipeline (dev mode via tsx)
 npm run build                                          # Compile TypeScript (tsc → dist/)
 npm test                                               # Run unit tests with AVA
 npm run lint                                           # Lint with XO

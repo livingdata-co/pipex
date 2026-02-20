@@ -6,13 +6,13 @@ import {PipelineLoader} from '../../core/pipeline-loader.js'
 import {PipelineRunner} from '../../core/pipeline-runner.js'
 import {ConsoleReporter} from '../../core/reporter.js'
 import {InteractiveReporter} from '../interactive-reporter.js'
-import {getGlobalOptions} from '../utils.js'
+import {getGlobalOptions, resolvePipelineFile} from '../utils.js'
 
 export function registerRunCommand(program: Command): void {
   program
     .command('run')
     .description('Execute a pipeline')
-    .argument('<pipeline>', 'Pipeline file to execute (JSON or YAML)')
+    .argument('[pipeline]', 'Pipeline file or directory (default: current directory)')
     .option('-w, --workspace <name>', 'Workspace name (for caching)')
     .option('-f, --force [steps]', 'Skip cache for all steps, or a comma-separated list (e.g. --force step1,step2)')
     .option('--dry-run', 'Validate pipeline and show what would run without executing')
@@ -20,7 +20,8 @@ export function registerRunCommand(program: Command): void {
     .option('-t, --target <steps>', 'Execute only these steps and their dependencies (comma-separated)')
     .option('-c, --concurrency <number>', 'Max parallel step executions (default: CPU count)', Number)
     .option('--env-file <path>', 'Load environment variables from a dotenv file for all steps')
-    .action(async (pipelineFile: string, options: {workspace?: string; force?: string | boolean; dryRun?: boolean; verbose?: boolean; target?: string; concurrency?: number; envFile?: string}, cmd: Command) => {
+    .action(async (pipelineArg: string | undefined, options: {workspace?: string; force?: string | boolean; dryRun?: boolean; verbose?: boolean; target?: string; concurrency?: number; envFile?: string}, cmd: Command) => {
+      const pipelineFile = await resolvePipelineFile(pipelineArg)
       const {workdir, json} = getGlobalOptions(cmd)
       const workdirRoot = resolve(workdir)
       const loader = new PipelineLoader()

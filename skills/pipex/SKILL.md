@@ -10,16 +10,18 @@ Containerized pipeline execution engine. Each step runs in an isolated Docker co
 ## CLI Quick Reference
 
 ```bash
-pipex run <pipeline.yaml>                    # Run a pipeline
-pipex run pipeline.yaml --workspace my-ws    # Named workspace for caching
-pipex run pipeline.yaml --force              # Skip cache for all steps
-pipex run pipeline.yaml --force step1,step2  # Skip cache for specific steps
-pipex run pipeline.yaml --target merge       # Run only 'merge' + its dependencies
-pipex run pipeline.yaml --concurrency 4      # Limit parallel steps
-pipex run pipeline.yaml --env-file .env       # Load env vars from file for all steps
-pipex run pipeline.yaml --dry-run            # Validate without executing
-pipex run pipeline.yaml --verbose            # Stream container logs live
-pipex run pipeline.yaml --json               # Structured JSON output (CI/CD)
+pipex run                                    # Auto-detect pipeline.yml/yaml/json in cwd
+pipex run examples/geodata/                  # Auto-detect pipeline file in directory
+pipex run pipeline.yaml                      # Explicit pipeline file
+pipex run --workspace my-ws                  # Named workspace for caching
+pipex run --force                            # Skip cache for all steps
+pipex run --force step1,step2               # Skip cache for specific steps
+pipex run --target merge                     # Run only 'merge' + its dependencies
+pipex run --concurrency 4                    # Limit parallel steps
+pipex run --env-file .env                     # Load env vars from file for all steps
+pipex run --dry-run                          # Validate without executing
+pipex run --verbose                          # Stream container logs live
+pipex run --json                             # Structured JSON output (CI/CD)
 
 pipex exec <ws> -f step.yaml --step <id>     # Execute a single step
 pipex exec <ws> -f step.yaml --step <id> --input prev-step  # Chain steps

@@ -26,15 +26,23 @@ pipex run pipeline.yaml
 
 ## Usage
 
+The `run` command accepts a pipeline file path, a directory, or nothing (defaults to current directory). When given a directory (or no argument), pipex looks for `pipeline.yml`, `pipeline.yaml`, or `pipeline.json` in order.
+
 ```bash
-# Interactive mode (default)
+# Run from current directory (auto-detects pipeline file)
+pipex run
+
+# Run from a directory
+pipex run examples/geodata/
+
+# Run a specific file
 pipex run pipeline.yaml
 
 # JSON mode (for CI/CD)
-pipex run pipeline.yaml --json
+pipex run --json
 
 # Custom workdir
-pipex run pipeline.yaml --workdir /tmp/builds
+pipex run --workdir /tmp/builds
 ```
 
 ### Interactive step execution
@@ -110,7 +118,7 @@ pipex clean
 
 | Command | Description |
 |---------|-------------|
-| `run <pipeline>` | Execute a pipeline |
+| `run [pipeline]` | Execute a pipeline (file, directory, or cwd) |
 | `exec <workspace> -f <step-file>` | Execute a single step in a workspace |
 | `cat <workspace> <step> [path]` | Read or list artifact content from a step's latest run |
 | `show <workspace>` | Show steps and runs in a workspace |
@@ -481,7 +489,7 @@ examples/geodata/
 Steps: `download` → `extract` → `list-files` / `build-csv`
 
 ```bash
-pipex run examples/geodata/pipeline.yaml
+pipex run examples/geodata/
 ```
 
 ### Text Processing
@@ -497,13 +505,13 @@ Steps: `generate` → `stats` + `filter` (parallel) → `report` → `notify` (c
 
 ```bash
 # Default: notify and audit are skipped (conditions not met)
-pipex run examples/text-processing/pipeline.yaml
+pipex run examples/text-processing/
 
 # Enable notifications
-NOTIFY=1 pipex run examples/text-processing/pipeline.yaml
+NOTIFY=1 pipex run examples/text-processing/
 
 # Only run stats and its dependencies
-pipex run examples/text-processing/pipeline.yaml --target stats
+pipex run examples/text-processing/ --target stats
 ```
 
 ### Multi-Language
@@ -528,7 +536,7 @@ examples/multi-language/
 Steps: `node-analyze` → `node-transform` → `python-analyze` → `python-transform`
 
 ```bash
-pipex run examples/multi-language/pipeline.yaml
+pipex run examples/multi-language/
 ```
 
 ## Caching & Workspaces
@@ -587,7 +595,8 @@ cp .env.example .env
 Run the CLI without building (via tsx):
 
 ```bash
-npm run cli -- run pipeline.yaml
+npm run cli -- run                # auto-detects pipeline file in cwd
+npm run cli -- run pipeline.yaml  # explicit file
 npm run cli -- list
 ```
 
