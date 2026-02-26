@@ -6,6 +6,7 @@ import {PipelineLoader} from '../../core/pipeline-loader.js'
 import {PipelineRunner} from '../../core/pipeline-runner.js'
 import {ConsoleReporter} from '../../core/reporter.js'
 import {InteractiveReporter} from '../interactive-reporter.js'
+import {loadConfig} from '../config.js'
 import {getGlobalOptions, resolvePipelineFile} from '../utils.js'
 
 export function registerRunCommand(program: Command): void {
@@ -23,6 +24,9 @@ export function registerRunCommand(program: Command): void {
     .action(async (pipelineArg: string | undefined, options: {workspace?: string; force?: string | boolean; dryRun?: boolean; verbose?: boolean; target?: string; concurrency?: number; envFile?: string}, cmd: Command) => {
       const pipelineFile = await resolvePipelineFile(pipelineArg)
       const {workdir, json} = getGlobalOptions(cmd)
+      const cwd = process.cwd()
+      const config = await loadConfig(cwd)
+      const kitContext = {config, cwd}
       const workdirRoot = resolve(workdir)
       const loader = new PipelineLoader()
       const runtime = new DockerCliExecutor()
@@ -45,7 +49,7 @@ export function registerRunCommand(program: Command): void {
           ? true
           : (typeof options.force === 'string' ? options.force.split(',') : undefined)
         const target = options.target ? options.target.split(',') : undefined
-        await runner.run(pipelineFile, {workspace: options.workspace, force, dryRun: options.dryRun, target, concurrency: options.concurrency, envFile: options.envFile})
+        await runner.run(pipelineFile, {workspace: options.workspace, force, dryRun: options.dryRun, target, concurrency: options.concurrency, envFile: options.envFile, kitContext})
         if (json) {
           console.log('Pipeline completed')
         }

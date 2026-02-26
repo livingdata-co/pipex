@@ -27,15 +27,6 @@ const builtinKits = new Map<string, Kit>([
   [shellKit.name, shellKit]
 ])
 
-export function getKit(name: string): Kit {
-  const kit = builtinKits.get(name)
-  if (!kit) {
-    throw new KitError('UNKNOWN_KIT', `Unknown kit: "${name}". Available kits: ${[...builtinKits.keys()].join(', ')}`)
-  }
-
-  return kit
-}
-
 /**
  * Resolves a kit by name.
  *

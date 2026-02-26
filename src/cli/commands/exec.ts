@@ -9,6 +9,7 @@ import {StepRunner} from '../../core/step-runner.js'
 import {StateManager} from '../../core/state.js'
 import {ConsoleReporter, type JobContext} from '../../core/reporter.js'
 import {InteractiveReporter} from '../interactive-reporter.js'
+import {loadConfig} from '../config.js'
 import {getGlobalOptions} from '../utils.js'
 
 export function registerExecCommand(program: Command): void {
@@ -34,8 +35,11 @@ export function registerExecCommand(program: Command): void {
       const reporter = json ? new ConsoleReporter() : new InteractiveReporter({verbose: options.verbose})
 
       // Load step from file
+      const cwd = process.cwd()
+      const config = await loadConfig(cwd)
+      const kitContext = {config, cwd}
       const stepFilePath = resolve(options.file)
-      const step = await loadStepFile(stepFilePath, options.step)
+      const step = await loadStepFile(stepFilePath, options.step, kitContext)
       const pipelineRoot = dirname(stepFilePath)
 
       // Open or create workspace

@@ -1,5 +1,5 @@
 import {ValidationError} from '../errors.js'
-import {getKit, resolveKit, type KitContext} from '../kits/index.js'
+import {resolveKit, type KitContext} from '../kits/index.js'
 import {isKitStep, type CacheSpec, type KitStepDefinition, type MountSpec, type Step, type StepDefinition} from '../types.js'
 import {slugify, mergeEnv, mergeCaches, mergeMounts, mergeSetup} from './pipeline-loader.js'
 
@@ -26,7 +26,7 @@ export async function resolveStep(step: StepDefinition, context?: KitContext): P
 }
 
 async function resolveKitStep(step: KitStepDefinition, id: string, name: string | undefined, context?: KitContext): Promise<Step> {
-  const kit = context ? await resolveKit(step.uses, context) : getKit(step.uses)
+  const kit = await resolveKit(step.uses, context)
   const kitOutput = kit.resolve(step.with ?? {})
 
   return {

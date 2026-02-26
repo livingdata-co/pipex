@@ -4,35 +4,7 @@ import {mkdir, writeFile} from 'node:fs/promises'
 import {randomUUID} from 'node:crypto'
 import test from 'ava'
 import {KitError} from '../../errors.js'
-import {getKit, resolveKit, type KitContext} from '../index.js'
-
-// ---------------------------------------------------------------------------
-// getKit (legacy, kept until commit 4 removes it)
-// ---------------------------------------------------------------------------
-
-test('getKit returns node kit', t => {
-  const kit = getKit('node')
-  t.is(kit.name, 'node')
-})
-
-test('getKit returns python kit', t => {
-  const kit = getKit('python')
-  t.is(kit.name, 'python')
-})
-
-test('getKit returns shell kit', t => {
-  const kit = getKit('shell')
-  t.is(kit.name, 'shell')
-})
-
-test('getKit throws KitError on unknown kit with available list', t => {
-  const error = t.throws(() => getKit('unknown'))
-  t.true(error instanceof KitError)
-  t.truthy(error?.message.includes('Unknown kit'))
-  t.truthy(error?.message.includes('node'))
-  t.truthy(error?.message.includes('python'))
-  t.truthy(error?.message.includes('shell'))
-})
+import {resolveKit, type KitContext} from '../index.js'
 
 // ---------------------------------------------------------------------------
 // resolveKit — builtin resolution

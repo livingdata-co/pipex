@@ -3,6 +3,8 @@ export {StepRunner} from './step-runner.js'
 export {PipelineLoader} from './pipeline-loader.js'
 export {loadStepFile} from './step-loader.js'
 export {resolveStep, validateStep} from './step-resolver.js'
+export {resolveKit} from '../kits/index.js'
+export type {KitContext} from '../kits/index.js'
 export {StateManager} from './state.js'
 export {ConsoleReporter} from './reporter.js'
 export type {

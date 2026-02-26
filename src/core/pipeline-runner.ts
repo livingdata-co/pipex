@@ -7,6 +7,7 @@ import {createWriteStream, type WriteStream} from 'node:fs'
 import {dirname, join, resolve} from 'node:path'
 import {Workspace, type ContainerExecutor, type InputMount, type OutputMount, type CacheMount, type BindMount, type SetupPhase} from '../engine/index.js'
 import {ContainerCrashError, PipexError} from '../errors.js'
+import type {KitContext} from '../kits/index.js'
 import {loadEnvFile} from './env-file.js'
 import type {Step} from '../types.js'
 import type {Reporter, StepRef, JobContext} from './reporter.js'
@@ -35,9 +36,10 @@ export class PipelineRunner {
     target?: string[];
     concurrency?: number;
     envFile?: string;
+    kitContext?: KitContext;
   }): Promise<void> {
-    const {workspace: workspaceName, force, dryRun, target, concurrency, envFile} = options ?? {}
-    const config = await this.loader.load(pipelineFilePath)
+    const {workspace: workspaceName, force, dryRun, target, concurrency, envFile, kitContext} = options ?? {}
+    const config = await this.loader.load(pipelineFilePath, kitContext)
     const pipelineRoot = dirname(resolve(pipelineFilePath))
 
     const workspaceId = workspaceName ?? config.id
