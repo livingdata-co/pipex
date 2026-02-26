@@ -134,8 +134,8 @@ test('mergeMounts concatenates mounts', t => {
 
 const loader = new PipelineLoader()
 
-test('parse: valid pipeline with raw steps', t => {
-  const pipeline = loader.parse(JSON.stringify({
+test('parse: valid pipeline with raw steps', async t => {
+  const pipeline = await loader.parse(JSON.stringify({
     id: 'my-pipeline',
     steps: [{
       id: 'step1',
@@ -149,8 +149,8 @@ test('parse: valid pipeline with raw steps', t => {
   t.is(pipeline.steps[0].id, 'step1')
 })
 
-test('parse: derives id from name via slugify', t => {
-  const pipeline = loader.parse(JSON.stringify({
+test('parse: derives id from name via slugify', async t => {
+  const pipeline = await loader.parse(JSON.stringify({
     name: 'Mon Pipeline',
     steps: [{
       name: 'Première Étape',
@@ -163,58 +163,58 @@ test('parse: derives id from name via slugify', t => {
   t.is(pipeline.steps[0].id, 'premiere-etape')
 })
 
-test('parse: throws ValidationError when neither id nor name on pipeline', t => {
-  const error = t.throws(() => loader.parse(JSON.stringify({
+test('parse: throws ValidationError when neither id nor name on pipeline', async t => {
+  const error = await t.throwsAsync(async () => loader.parse(JSON.stringify({
     steps: [{id: 's', image: 'alpine', cmd: ['echo']}]
   }), 'p.json'), {message: /at least one of "id" or "name"/})
   t.true(error instanceof ValidationError)
 })
 
-test('parse: throws ValidationError when neither id nor name on step', t => {
-  const error = t.throws(() => loader.parse(JSON.stringify({
+test('parse: throws ValidationError when neither id nor name on step', async t => {
+  const error = await t.throwsAsync(async () => loader.parse(JSON.stringify({
     id: 'p',
     steps: [{image: 'alpine', cmd: ['echo']}]
   }), 'p.json'), {message: /at least one of "id" or "name"/})
   t.true(error instanceof ValidationError)
 })
 
-test('parse: throws ValidationError on empty steps array', t => {
-  const error = t.throws(() => loader.parse(JSON.stringify({
+test('parse: throws ValidationError on empty steps array', async t => {
+  const error = await t.throwsAsync(async () => loader.parse(JSON.stringify({
     id: 'p', steps: []
   }), 'p.json'), {message: /steps must be a non-empty array/})
   t.true(error instanceof ValidationError)
 })
 
-test('parse: throws on invalid identifier with path traversal', t => {
-  t.throws(() => loader.parse(JSON.stringify({
+test('parse: throws on invalid identifier with path traversal', async t => {
+  await t.throwsAsync(async () => loader.parse(JSON.stringify({
     id: 'p',
     steps: [{id: '../bad', image: 'alpine', cmd: ['echo']}]
   }), 'p.json'), {message: /must contain only alphanumeric/})
 })
 
-test('parse: throws on invalid identifier with special chars', t => {
-  t.throws(() => loader.parse(JSON.stringify({
+test('parse: throws on invalid identifier with special chars', async t => {
+  await t.throwsAsync(async () => loader.parse(JSON.stringify({
     id: 'p',
     steps: [{id: 'hello world', image: 'alpine', cmd: ['echo']}]
   }), 'p.json'), {message: /must contain only alphanumeric/})
 })
 
-test('parse: throws when step has no image', t => {
-  t.throws(() => loader.parse(JSON.stringify({
+test('parse: throws when step has no image', async t => {
+  await t.throwsAsync(async () => loader.parse(JSON.stringify({
     id: 'p',
     steps: [{id: 's', cmd: ['echo']}]
   }), 'p.json'), {message: /image is required/})
 })
 
-test('parse: throws when step has no cmd', t => {
-  t.throws(() => loader.parse(JSON.stringify({
+test('parse: throws when step has no cmd', async t => {
+  await t.throwsAsync(async () => loader.parse(JSON.stringify({
     id: 'p',
     steps: [{id: 's', image: 'alpine'}]
   }), 'p.json'), {message: /cmd must be a non-empty array/})
 })
 
-test('parse: throws ValidationError on duplicate step ids', t => {
-  const error = t.throws(() => loader.parse(JSON.stringify({
+test('parse: throws ValidationError on duplicate step ids', async t => {
+  const error = await t.throwsAsync(async () => loader.parse(JSON.stringify({
     id: 'p',
     steps: [
       {id: 's', image: 'alpine', cmd: ['echo']},
@@ -224,8 +224,8 @@ test('parse: throws ValidationError on duplicate step ids', t => {
   t.true(error instanceof ValidationError)
 })
 
-test('parse: validates mount host must be relative', t => {
-  t.throws(() => loader.parse(JSON.stringify({
+test('parse: validates mount host must be relative', async t => {
+  await t.throwsAsync(async () => loader.parse(JSON.stringify({
     id: 'p',
     steps: [{
       id: 's', image: 'alpine', cmd: ['echo'],
@@ -234,8 +234,8 @@ test('parse: validates mount host must be relative', t => {
   }), 'p.json'), {message: /must be a relative path/})
 })
 
-test('parse: allows mount host with ..', t => {
-  t.notThrows(() => loader.parse(JSON.stringify({
+test('parse: allows mount host with ..', async t => {
+  await t.notThrowsAsync(async () => loader.parse(JSON.stringify({
     id: 'p',
     steps: [{
       id: 's', image: 'alpine', cmd: ['echo'],
@@ -244,8 +244,8 @@ test('parse: allows mount host with ..', t => {
   }), 'p.json'))
 })
 
-test('parse: validates mount container must be absolute', t => {
-  t.throws(() => loader.parse(JSON.stringify({
+test('parse: validates mount container must be absolute', async t => {
+  await t.throwsAsync(async () => loader.parse(JSON.stringify({
     id: 'p',
     steps: [{
       id: 's', image: 'alpine', cmd: ['echo'],
@@ -254,8 +254,8 @@ test('parse: validates mount container must be absolute', t => {
   }), 'p.json'), {message: /must be an absolute path/})
 })
 
-test('parse: validates cache path must be absolute', t => {
-  t.throws(() => loader.parse(JSON.stringify({
+test('parse: validates cache path must be absolute', async t => {
+  await t.throwsAsync(async () => loader.parse(JSON.stringify({
     id: 'p',
     steps: [{
       id: 's', image: 'alpine', cmd: ['echo'],
@@ -264,8 +264,8 @@ test('parse: validates cache path must be absolute', t => {
   }), 'p.json'), {message: /must be an absolute path/})
 })
 
-test('parse: validates cache name is a valid identifier', t => {
-  t.throws(() => loader.parse(JSON.stringify({
+test('parse: validates cache name is a valid identifier', async t => {
+  await t.throwsAsync(async () => loader.parse(JSON.stringify({
     id: 'p',
     steps: [{
       id: 's', image: 'alpine', cmd: ['echo'],
@@ -274,8 +274,8 @@ test('parse: validates cache name is a valid identifier', t => {
   }), 'p.json'), {message: /must contain only alphanumeric/})
 })
 
-test('parse: resolves kit step (uses → image/cmd)', t => {
-  const pipeline = loader.parse(JSON.stringify({
+test('parse: resolves kit step (uses → image/cmd)', async t => {
+  const pipeline = await loader.parse(JSON.stringify({
     id: 'p',
     steps: [{
       id: 'b',
@@ -292,8 +292,8 @@ test('parse: resolves kit step (uses → image/cmd)', t => {
 // DAG validation
 // ---------------------------------------------------------------------------
 
-test('parse: detects cycle → CyclicDependencyError', t => {
-  const error = t.throws(() => loader.parse(JSON.stringify({
+test('parse: detects cycle → CyclicDependencyError', async t => {
+  const error = await t.throwsAsync(async () => loader.parse(JSON.stringify({
     id: 'p',
     steps: [
       {id: 'a', image: 'alpine', cmd: ['echo'], inputs: [{step: 'b'}]},
@@ -303,8 +303,8 @@ test('parse: detects cycle → CyclicDependencyError', t => {
   t.true(error instanceof CyclicDependencyError)
 })
 
-test('parse: missing input ref → error', t => {
-  t.throws(() => loader.parse(JSON.stringify({
+test('parse: missing input ref → error', async t => {
+  await t.throwsAsync(async () => loader.parse(JSON.stringify({
     id: 'p',
     steps: [
       {id: 'a', image: 'alpine', cmd: ['echo'], inputs: [{step: 'missing'}]}
@@ -312,8 +312,8 @@ test('parse: missing input ref → error', t => {
   }), 'p.json'), {message: /unknown step 'missing'/})
 })
 
-test('parse: optional input to unknown step → OK', t => {
-  t.notThrows(() => loader.parse(JSON.stringify({
+test('parse: optional input to unknown step → OK', async t => {
+  await t.notThrowsAsync(async () => loader.parse(JSON.stringify({
     id: 'p',
     steps: [
       {id: 'a', image: 'alpine', cmd: ['echo'], inputs: [{step: 'missing', optional: true}]}
@@ -321,8 +321,8 @@ test('parse: optional input to unknown step → OK', t => {
   }), 'p.json'))
 })
 
-test('parse: valid DAG diamond → OK', t => {
-  t.notThrows(() => loader.parse(JSON.stringify({
+test('parse: valid DAG diamond → OK', async t => {
+  await t.notThrowsAsync(async () => loader.parse(JSON.stringify({
     id: 'p',
     steps: [
       {id: 'a', image: 'alpine', cmd: ['echo']},
@@ -383,8 +383,8 @@ test('mergeSetup falls back to kit allowNetwork when user omits it', t => {
 // Setup validation
 // ---------------------------------------------------------------------------
 
-test('parse: step with valid setup passes validation', t => {
-  t.notThrows(() => loader.parse(JSON.stringify({
+test('parse: step with valid setup passes validation', async t => {
+  await t.notThrowsAsync(async () => loader.parse(JSON.stringify({
     id: 'p',
     steps: [{
       id: 's', image: 'alpine', cmd: ['echo'],
@@ -393,8 +393,8 @@ test('parse: step with valid setup passes validation', t => {
   }), 'p.json'))
 })
 
-test('parse: setup with empty cmd throws ValidationError', t => {
-  t.throws(() => loader.parse(JSON.stringify({
+test('parse: setup with empty cmd throws ValidationError', async t => {
+  await t.throwsAsync(async () => loader.parse(JSON.stringify({
     id: 'p',
     steps: [{
       id: 's', image: 'alpine', cmd: ['echo'],
@@ -403,8 +403,8 @@ test('parse: setup with empty cmd throws ValidationError', t => {
   }), 'p.json'), {message: /setup\.cmd must be a non-empty array/})
 })
 
-test('parse: setup with invalid cache name throws ValidationError', t => {
-  t.throws(() => loader.parse(JSON.stringify({
+test('parse: setup with invalid cache name throws ValidationError', async t => {
+  await t.throwsAsync(async () => loader.parse(JSON.stringify({
     id: 'p',
     steps: [{
       id: 's', image: 'alpine', cmd: ['echo'],
@@ -413,8 +413,8 @@ test('parse: setup with invalid cache name throws ValidationError', t => {
   }), 'p.json'), {message: /must contain only alphanumeric/})
 })
 
-test('parse: setup with relative cache path throws ValidationError', t => {
-  t.throws(() => loader.parse(JSON.stringify({
+test('parse: setup with relative cache path throws ValidationError', async t => {
+  await t.throwsAsync(async () => loader.parse(JSON.stringify({
     id: 'p',
     steps: [{
       id: 's', image: 'alpine', cmd: ['echo'],

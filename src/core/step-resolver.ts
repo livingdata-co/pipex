@@ -1,13 +1,16 @@
 import {ValidationError} from '../errors.js'
-import {getKit} from '../kits/index.js'
+import {getKit, resolveKit, type KitContext} from '../kits/index.js'
 import {isKitStep, type CacheSpec, type KitStepDefinition, type MountSpec, type Step, type StepDefinition} from '../types.js'
 import {slugify, mergeEnv, mergeCaches, mergeMounts, mergeSetup} from './pipeline-loader.js'
 
 /**
  * Resolves a step definition into a fully resolved Step.
  * Kit steps (`uses`) are expanded into image + cmd.
+ *
+ * When a KitContext is provided, user-defined kits are resolved via
+ * alias, local `kits/` directory, builtins, or npm modules.
  */
-export function resolveStep(step: StepDefinition): Step {
+export async function resolveStep(step: StepDefinition, context?: KitContext): Promise<Step> {
   if (!step.id && !step.name) {
     throw new ValidationError('Invalid step: at least one of "id" or "name" must be defined')
   }
@@ -19,11 +22,11 @@ export function resolveStep(step: StepDefinition): Step {
     return {...step, id, name}
   }
 
-  return resolveKitStep(step, id, name)
+  return resolveKitStep(step, id, name, context)
 }
 
-function resolveKitStep(step: KitStepDefinition, id: string, name: string | undefined): Step {
-  const kit = getKit(step.uses)
+async function resolveKitStep(step: KitStepDefinition, id: string, name: string | undefined, context?: KitContext): Promise<Step> {
+  const kit = context ? await resolveKit(step.uses, context) : getKit(step.uses)
   const kitOutput = kit.resolve(step.with ?? {})
 
   return {

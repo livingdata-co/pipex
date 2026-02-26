@@ -3,17 +3,18 @@ import {extname} from 'node:path'
 import {deburr} from 'lodash-es'
 import {parse as parseYaml} from 'yaml'
 import {ValidationError} from '../errors.js'
+import type {KitContext} from '../kits/index.js'
 import type {CacheSpec, MountSpec, Pipeline, PipelineDefinition, SetupSpec, Step} from '../types.js'
 import {buildGraph, validateGraph} from './dag.js'
 import {resolveStep, validateStep} from './step-resolver.js'
 
 export class PipelineLoader {
-  async load(filePath: string): Promise<Pipeline> {
+  async load(filePath: string, context?: KitContext): Promise<Pipeline> {
     const content = await readFile(filePath, 'utf8')
-    return this.parse(content, filePath)
+    return this.parse(content, filePath, context)
   }
 
-  parse(content: string, filePath: string): Pipeline {
+  async parse(content: string, filePath: string, context?: KitContext): Promise<Pipeline> {
     const input = parsePipelineFile(content, filePath) as PipelineDefinition
 
     if (!input.id && !input.name) {
@@ -26,7 +27,7 @@ export class PipelineLoader {
       throw new ValidationError('Invalid pipeline: steps must be a non-empty array')
     }
 
-    const steps = input.steps.map(step => resolveStep(step))
+    const steps = await Promise.all(input.steps.map(async step => resolveStep(step, context)))
 
     for (const step of steps) {
       validateStep(step)

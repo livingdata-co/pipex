@@ -1,5 +1,6 @@
 import {readFile} from 'node:fs/promises'
 import {ValidationError} from '../errors.js'
+import type {KitContext} from '../kits/index.js'
 import type {StepDefinition, Step} from '../types.js'
 import {parsePipelineFile} from './pipeline-loader.js'
 import {resolveStep, validateStep} from './step-resolver.js'
@@ -7,7 +8,7 @@ import {resolveStep, validateStep} from './step-resolver.js'
 /**
  * Loads and resolves a single step definition from a file.
  */
-export async function loadStepFile(filePath: string, stepIdOverride?: string): Promise<Step> {
+export async function loadStepFile(filePath: string, stepIdOverride?: string, context?: KitContext): Promise<Step> {
   const content = await readFile(filePath, 'utf8')
   const raw = parsePipelineFile(content, filePath) as StepDefinition
 
@@ -25,7 +26,7 @@ export async function loadStepFile(filePath: string, stepIdOverride?: string): P
     (raw as Record<string, unknown>).id = stepIdOverride
   }
 
-  const step = resolveStep(raw)
+  const step = await resolveStep(raw, context)
   validateStep(step)
   return step
 }
