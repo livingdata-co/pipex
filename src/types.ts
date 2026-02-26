@@ -145,3 +145,11 @@ export type PipelineDefinition = {
 export function isKitStep(step: StepDefinition): step is KitStepDefinition {
   return 'uses' in step && typeof step.uses === 'string'
 }
+
+// -- Configuration -----------------------------------------------------------
+
+/** Project-level configuration (`.pipex.yml`). */
+export type PipexConfig = {
+  /** Kit aliases: maps a short name to a file path or npm module specifier. */
+  kits?: Record<string, string>;
+}
