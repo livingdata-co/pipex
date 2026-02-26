@@ -282,6 +282,46 @@ When `packages` is provided, the kit switches to a Debian image and installs pac
   inputs: [{ step: download }]
 ```
 
+### User-Defined Kits
+
+You can create your own kits as JavaScript (ESM) files that export a default `resolve` function:
+
+```js
+// kits/rust.js
+export default function resolve(params) {
+  return {
+    image: `rust:${params.version ?? '1'}`,
+    cmd: ['cargo', 'run'],
+    sources: params.src ? [{ host: params.src, container: '/app' }] : undefined,
+  }
+}
+```
+
+**Resolution order** when `uses: X` is encountered:
+
+1. **Alias** — check `.pipex.yml` `kits` mapping
+2. **Local file** — `kits/<name>.js` in the current working directory
+3. **Builtin** — `node`, `python`, `shell`
+4. **npm module** — `import(name)` for scoped packages (`@myorg/kit`) or paths containing `/`
+
+**`.pipex.yml`** (project root):
+
+```yaml
+kits:
+  spark: "@myorg/analytics/spark"
+  rust: "./custom-kits/rust.js"
+```
+
+Then reference them in your pipeline:
+
+```yaml
+name: my-pipeline
+steps:
+  - id: build
+    uses: rust
+    with: { version: "1.80" }
+```
+
 ### Raw Steps
 
 For full control, define `image` and `cmd` directly:
