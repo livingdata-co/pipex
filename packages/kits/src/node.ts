@@ -1,5 +1,4 @@
-import {KitError, MissingParameterError} from '../../errors.js'
-import type {Kit, KitOutput} from '../index.js'
+import {KitError, MissingParameterError, type Kit, type KitOutput} from '@livingdata/pipex-core'
 
 const cacheMap: Record<string, {name: string; path: string}> = {
   npm: {name: 'npm-cache', path: '/root/.npm'},

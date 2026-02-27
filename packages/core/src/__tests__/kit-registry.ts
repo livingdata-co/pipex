@@ -3,26 +3,40 @@ import {join} from 'node:path'
 import {mkdir, writeFile} from 'node:fs/promises'
 import {randomUUID} from 'node:crypto'
 import test from 'ava'
-import {KitError} from '../../errors.js'
-import {resolveKit, type KitContext} from '../index.js'
+import {KitError} from '../errors.js'
+import type {Kit, KitContext} from '../types.js'
+import {resolveKit} from '../kit-registry.js'
+
+// -- Test builtin kit for use in tests ----------------------------------------
+
+const fakeKit: Kit = {
+  name: 'shell',
+  resolve() {
+    return {image: 'alpine:3.20', cmd: ['sh', '-c', 'echo hi']}
+  }
+}
+
+const builtins = new Map<string, Kit>([['shell', fakeKit]])
 
 // ---------------------------------------------------------------------------
 // resolveKit — builtin resolution
 // ---------------------------------------------------------------------------
 
-test('resolveKit returns builtin without context', async t => {
-  const kit = await resolveKit('node')
-  t.is(kit.name, 'node')
-})
-
-test('resolveKit returns builtin with empty context', async t => {
-  const context: KitContext = {config: {}, cwd: '/tmp'}
+test('resolveKit returns builtin from context.builtins', async t => {
+  const context: KitContext = {config: {}, cwd: '/tmp', builtins}
   const kit = await resolveKit('shell', context)
   t.is(kit.name, 'shell')
 })
 
 test('resolveKit throws on unknown kit without context', async t => {
   const error = await t.throwsAsync(async () => resolveKit('unknown'))
+  t.true(error instanceof KitError)
+  t.truthy(error?.message.includes('Unknown kit'))
+})
+
+test('resolveKit throws on unknown kit with context but no matching builtin', async t => {
+  const context: KitContext = {config: {}, cwd: '/tmp', builtins}
+  const error = await t.throwsAsync(async () => resolveKit('unknown', context))
   t.true(error instanceof KitError)
   t.truthy(error?.message.includes('Unknown kit'))
 })
@@ -80,7 +94,7 @@ test('resolveKit local file shadows builtin', async t => {
     return { image: 'my-shell:1', cmd: ['sh'] }
   }`, 'utf8')
 
-  const context: KitContext = {config: {}, cwd: dir}
+  const context: KitContext = {config: {}, cwd: dir, builtins}
   const kit = await resolveKit('shell', context)
   const output = await kit.resolve({})
   t.is(output.image, 'my-shell:1')

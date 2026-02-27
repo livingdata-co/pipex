@@ -1,5 +1,5 @@
 import test from 'ava'
-import {KitError, MissingParameterError} from '../../../errors.js'
+import {KitError, MissingParameterError} from '@livingdata/pipex-core'
 import {pythonKit} from '../python.js'
 
 test('resolve with minimal params (script only)', async t => {
