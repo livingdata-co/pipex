@@ -1,21 +1,57 @@
 import {readFile} from 'node:fs/promises'
+import process from 'node:process'
 import {dirname, extname, resolve} from 'node:path'
 import {deburr} from 'lodash-es'
 import {parse as parseYaml} from 'yaml'
 import {ValidationError} from './errors.js'
-import type {CacheSpec, KitContext, MountSpec, Pipeline, PipelineDefinition, SetupSpec, Step} from './types.js'
+import type {CacheSpec, KitContext, MountSpec, Pipeline, PipelineDefinition, SetupSpec, Step, StepDefinition} from './types.js'
 import {buildGraph, validateGraph} from './dag.js'
 import {resolveStep, validateStep} from './step-resolver.js'
 
 export class PipelineLoader {
-  async load(filePath: string, context?: KitContext): Promise<Pipeline> {
-    const content = await readFile(filePath, 'utf8')
-    return this.parse(content, filePath, context)
+  constructor(private readonly kitContext?: KitContext) {}
+
+  async load(input: string | PipelineDefinition): Promise<Pipeline> {
+    if (typeof input === 'string') {
+      const content = await readFile(input, 'utf8')
+      return this.parse(content, input)
+    }
+
+    // JS object: no file path, set root to cwd
+    return this.resolve(input, process.cwd())
   }
 
-  async parse(content: string, filePath: string, context?: KitContext): Promise<Pipeline> {
+  async parse(content: string, filePath: string): Promise<Pipeline> {
     const input = parsePipelineFile(content, filePath) as PipelineDefinition
+    const pipelineRoot = dirname(resolve(filePath))
+    return this.resolve(input, pipelineRoot)
+  }
 
+  async loadStep(filePath: string, stepIdOverride?: string): Promise<Step> {
+    const content = await readFile(filePath, 'utf8')
+    const raw = parsePipelineFile(content, filePath) as StepDefinition
+
+    if (!raw || typeof raw !== 'object') {
+      throw new ValidationError('Step file must contain an object')
+    }
+
+    // If no id/name provided, require --step override
+    if (!('id' in raw && raw.id) && !('name' in raw && raw.name) && !stepIdOverride) {
+      throw new ValidationError('Step file must have "id" or "name", or use --step to set an ID')
+    }
+
+    // Apply step ID override
+    if (stepIdOverride) {
+      (raw as Record<string, unknown>).id = stepIdOverride
+    }
+
+    const pipelineRoot = dirname(resolve(filePath))
+    const step = await resolveStep(raw, this.kitContext, pipelineRoot)
+    validateStep(step)
+    return step
+  }
+
+  private async resolve(input: PipelineDefinition, pipelineRoot: string): Promise<Pipeline> {
     if (!input.id && !input.name) {
       throw new ValidationError('Invalid pipeline: at least one of "id" or "name" must be defined')
     }
@@ -26,8 +62,7 @@ export class PipelineLoader {
       throw new ValidationError('Invalid pipeline: steps must be a non-empty array')
     }
 
-    const pipelineRoot = dirname(resolve(filePath))
-    const steps = await Promise.all(input.steps.map(async step => resolveStep(step, context, pipelineRoot)))
+    const steps = await Promise.all(input.steps.map(async step => resolveStep(step, this.kitContext, pipelineRoot)))
 
     for (const step of steps) {
       validateStep(step)
@@ -38,7 +73,7 @@ export class PipelineLoader {
     const graph = buildGraph(steps)
     validateGraph(graph, steps)
 
-    return {id: pipelineId, name: input.name, steps}
+    return {id: pipelineId, name: input.name, steps, root: pipelineRoot}
   }
 
   private validateUniqueStepIds(steps: Step[]): void {

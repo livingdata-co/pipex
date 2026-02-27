@@ -4,13 +4,12 @@ import {cpus} from 'node:os'
 import {cp, writeFile} from 'node:fs/promises'
 import {setTimeout} from 'node:timers/promises'
 import {createWriteStream, type WriteStream} from 'node:fs'
-import {dirname, join, resolve} from 'node:path'
+import {join, resolve} from 'node:path'
 import {Workspace, type ContainerExecutor, type InputMount, type OutputMount, type CacheMount, type BindMount, type SetupPhase} from './engine/index.js'
 import {ContainerCrashError, PipexError} from './errors.js'
 import {loadEnvFile} from './env-file.js'
-import type {KitContext, Step} from './types.js'
+import type {Pipeline, Step} from './types.js'
 import type {Reporter, StepRef, JobContext} from './reporter.js'
-import type {PipelineLoader} from './pipeline-loader.js'
 import {buildGraph, topologicalLevels, subgraph, leafNodes} from './dag.js'
 import {CacheLockManager} from './cache-lock.js'
 import {evaluateCondition} from './condition.js'
@@ -22,26 +21,23 @@ import {dirSize, resolveHostPath} from './utils.js'
  */
 export class PipelineRunner {
   constructor(
-    private readonly loader: PipelineLoader,
     private readonly runtime: ContainerExecutor,
     private readonly reporter: Reporter,
     private readonly workdirRoot: string
   ) {}
 
-  async run(pipelineFilePath: string, options?: {
+  async run(pipeline: Pipeline, options?: {
     workspace?: string;
     force?: true | string[];
     dryRun?: boolean;
     target?: string[];
     concurrency?: number;
     envFile?: string;
-    kitContext?: KitContext;
   }): Promise<void> {
-    const {workspace: workspaceName, force, dryRun, target, concurrency, envFile, kitContext} = options ?? {}
-    const config = await this.loader.load(pipelineFilePath, kitContext)
-    const pipelineRoot = dirname(resolve(pipelineFilePath))
+    const {workspace: workspaceName, force, dryRun, target, concurrency, envFile} = options ?? {}
+    const pipelineRoot = pipeline.root
 
-    const workspaceId = workspaceName ?? config.id
+    const workspaceId = workspaceName ?? pipeline.id
 
     let workspace: Workspace
     try {
@@ -67,15 +63,15 @@ export class PipelineRunner {
     const job: JobContext = {workspaceId: workspace.id, jobId: randomUUID()}
 
     // Build DAG and determine execution scope
-    const graph = buildGraph(config.steps)
+    const graph = buildGraph(pipeline.steps)
     const targets = target ?? leafNodes(graph)
     const activeSteps = subgraph(graph, targets)
 
     this.reporter.emit({
       ...job,
       event: 'PIPELINE_START',
-      pipelineName: config.name ?? config.id,
-      steps: config.steps
+      pipelineName: pipeline.name ?? pipeline.id,
+      steps: pipeline.steps
         .filter(s => activeSteps.has(s.id))
         .map(s => ({id: s.id, displayName: s.name ?? s.id}))
     })
@@ -83,7 +79,7 @@ export class PipelineRunner {
       .map(level => level.filter(id => activeSteps.has(id)))
       .filter(level => level.length > 0)
 
-    const stepMap = new Map(config.steps.map(s => [s.id, s]))
+    const stepMap = new Map(pipeline.steps.map(s => [s.id, s]))
     const failed = new Set<string>()
     const skipped = new Set<string>()
     const cacheLocks = new CacheLockManager()
