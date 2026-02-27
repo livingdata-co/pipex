@@ -1,6 +1,6 @@
 import test from 'ava'
-import {KitError, MissingParameterError} from '@livingdata/pipex-core'
-import {nodeKit} from '../node.js'
+import {KitError, MissingParameterError} from '../../errors.js'
+import {nodeKit} from '../../kits/node.js'
 
 test('resolve with minimal params (script only)', async t => {
   const result = await nodeKit.resolve({script: 'index.js'})

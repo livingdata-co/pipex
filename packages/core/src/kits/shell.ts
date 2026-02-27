@@ -1,4 +1,5 @@
-import {MissingParameterError, type Kit, type KitOutput} from '@livingdata/pipex-core'
+import {MissingParameterError} from '../errors.js'
+import type {Kit, KitOutput} from '../types.js'
 
 export const shellKit: Kit = {
   name: 'shell',

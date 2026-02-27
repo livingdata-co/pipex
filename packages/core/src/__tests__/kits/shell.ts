@@ -1,6 +1,6 @@
 import test from 'ava'
-import {MissingParameterError} from '@livingdata/pipex-core'
-import {shellKit} from '../shell.js'
+import {MissingParameterError} from '../../errors.js'
+import {shellKit} from '../../kits/shell.js'
 
 // -- Defaults (no packages) --------------------------------------------------
 
