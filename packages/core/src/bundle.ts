@@ -8,7 +8,7 @@ import {buffer as streamToBuffer} from 'node:stream/consumers'
 import ignore from 'ignore'
 import * as tar from 'tar'
 import {BundleError} from './errors.js'
-import type {KitContext, Pipeline} from './types.js'
+import type {Pipeline} from './types.js'
 import {PipelineLoader} from './pipeline-loader.js'
 
 const MAX_BUNDLE_SIZE = 50 * 1024 * 1024 // 50 MB
@@ -73,14 +73,14 @@ export async function buildIgnoreFilter(pipelineRoot: string): Promise<(path: st
   }
 }
 
-export async function buildBundle(pipelineFilePath: string, kitContext?: KitContext): Promise<Uint8Array> {
+export async function buildBundle(pipelineFilePath: string, loader?: PipelineLoader): Promise<Uint8Array> {
   const absolutePath = resolve(pipelineFilePath)
   const pipelineRoot = dirname(absolutePath)
 
-  const loader = new PipelineLoader()
-  const pipeline = await loader.load(absolutePath, kitContext)
+  const resolvedLoader = loader ?? new PipelineLoader()
+  const pipelineConfig = await resolvedLoader.load(absolutePath)
 
-  const deps = collectDependencies(pipeline)
+  const deps = collectDependencies(pipelineConfig)
 
   // Verify all dependencies exist
   for (const dep of deps) {
@@ -94,7 +94,7 @@ export async function buildBundle(pipelineFilePath: string, kitContext?: KitCont
 
   const shouldIgnore = await buildIgnoreFilter(pipelineRoot)
 
-  const manifest: Manifest = {version: MANIFEST_VERSION, pipeline}
+  const manifest: Manifest = {version: MANIFEST_VERSION, pipeline: pipelineConfig}
   const manifestJson = JSON.stringify(manifest, null, 2) + '\n'
 
   // Use a staging directory with symlinks to combine manifest + deps in a single tar

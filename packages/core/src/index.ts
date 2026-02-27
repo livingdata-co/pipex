@@ -4,17 +4,22 @@ export {ContainerExecutor, type LogLine, type OnLogLine} from './engine/executor
 export {DockerCliExecutor} from './engine/docker-executor.js'
 export type {BindMount, InputMount, OutputMount, CacheMount, SetupPhase, RunContainerRequest, RunContainerResult} from './engine/types.js'
 
+// Pipex facade
+export {Pipex, type PipexOptions} from './pipex.js'
+
 // Pipeline orchestration
 export {PipelineRunner} from './pipeline-runner.js'
 export {StepRunner} from './step-runner.js'
 export {PipelineLoader, slugify, parsePipelineFile, mergeEnv, mergeCaches, mergeMounts, mergeSetup} from './pipeline-loader.js'
-export {loadStepFile} from './step-loader.js'
 export {resolveStep, validateStep} from './step-resolver.js'
 export {StateManager} from './state.js'
 export {CacheLockManager} from './cache-lock.js'
 
 // Kit registry
 export {resolveKit, loadExternalKit} from './kit-registry.js'
+
+// Built-in kits
+export {defaultKits, nodeKit, pythonKit, shellKit} from './kits/index.js'
 
 // DAG utilities
 export {buildGraph, validateGraph, topologicalLevels, subgraph, leafNodes} from './dag.js'
