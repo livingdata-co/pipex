@@ -300,14 +300,81 @@ export default function resolve(params) {
 **Resolution order** when `uses: X` is encountered:
 
 1. **Alias** — check `.pipex.yml` `kits` mapping
-2. **Local file** — `kits/<name>.js` in the current working directory
-3. **Builtin** — `node`, `python`, `shell`
-4. **npm module** — `import(name)` for scoped packages (`@myorg/kit`) or paths containing `/`
+2. **Local directory** — `kits/<name>/index.js` (directory with companion files)
+3. **Local file** — `kits/<name>.js` (flat file)
+4. **Builtin** — `node`, `python`, `shell`
+5. **npm module** — `import(name)` for scoped packages (`@myorg/kit`) or paths containing `/`
+
+#### Directory kits with companion files
+
+Kits can be directories with an `index.js` entry point and companion files (scripts, config, requirements). The `resolve` function receives a second argument with `kitDir` (absolute path to the kit's directory) for referencing companion files:
+
+```
+kits/
+└── s3-loader/
+    ├── index.js          # Kit entry point
+    ├── loader.py         # Companion script
+    └── requirements.txt  # Companion config
+```
+
+```js
+// kits/s3-loader/index.js
+export default function resolve(params, { kitDir }) {
+  return {
+    image: 'python:3.12-slim',
+    cmd: ['python', '/app/loader.py'],
+    sources: [
+      { host: kitDir, container: '/app' }
+    ]
+  }
+}
+```
+
+The kit returns **absolute** host paths (built with `kitDir`). Pipex automatically converts them to pipeline-relative paths before validation, so the existing security model (`resolveHostPath`) is unchanged.
+
+#### Kit chaining
+
+A kit can compose another kit via `context.resolveKit()`. This enables extending builtin or other user-defined kits:
+
+```js
+// kits/s3-loader/index.js
+export default async function resolve(params, { kitDir, resolveKit }) {
+  const python = await resolveKit('python')
+  const base = await python.resolve({ version: '3.12', install: true })
+
+  return {
+    ...base,                              // Inherit image, setup, caches...
+    cmd: ['python', '/app/loader.py'],    // Override cmd
+    sources: [
+      ...(base.sources ?? []),
+      { host: kitDir, container: '/app' }
+    ]
+  }
+}
+```
+
+Chaining is plain JavaScript composition — the kit has full control over how it merges with the parent kit's output. User-level YAML overrides (`env`, `caches`, `mounts`, `setup`) still merge on top via `resolveKitStep`.
+
+#### npm kits
+
+Kits can be distributed as npm packages. Each kit is a subdirectory with an `index.js` entry point:
+
+```
+@myorg/kits-data/
+├── package.json          # with subpath exports
+└── s3-loader/
+    ├── index.js
+    ├── loader.py
+    └── requirements.txt
+```
+
+Reference them via `.pipex.yml` aliases or directly by specifier:
 
 **`.pipex.yml`** (project root):
 
 ```yaml
 kits:
+  s3-loader: "@myorg/kits-data/s3-loader"
   spark: "@myorg/analytics/spark"
   rust: "./custom-kits/rust.js"
 ```
@@ -320,6 +387,9 @@ steps:
   - id: build
     uses: rust
     with: { version: "1.80" }
+  - id: load
+    uses: s3-loader
+    with: { bucket: my-data }
 ```
 
 ### Raw Steps
