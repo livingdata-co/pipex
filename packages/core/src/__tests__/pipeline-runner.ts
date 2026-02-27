@@ -2,13 +2,13 @@ import {readFile, writeFile} from 'node:fs/promises'
 import {join} from 'node:path'
 import {stringify as yamlStringify} from 'yaml'
 import test from 'ava'
-import {DockerCliExecutor} from '../../engine/docker-executor.js'
+import {DockerCliExecutor} from '../engine/docker-executor.js'
 import {PipelineLoader} from '../pipeline-loader.js'
 import {PipelineRunner} from '../pipeline-runner.js'
-import {Workspace} from '../../engine/workspace.js'
-import {ContainerCrashError} from '../../errors.js'
+import {Workspace} from '../engine/workspace.js'
+import {ContainerCrashError} from '../errors.js'
 import type {StepFinishedEvent, StepSkippedEvent, StepStartingEvent} from '../reporter.js'
-import {createTmpDir, isDockerAvailable, noopReporter, recordingReporter} from '../../__tests__/helpers.js'
+import {createTmpDir, isDockerAvailable, noopReporter, recordingReporter} from './helpers.js'
 
 const hasDocker = isDockerAvailable()
 const dockerTest = hasDocker ? test : test.skip

@@ -1,5 +1,5 @@
 import test from 'ava'
-import {CyclicDependencyError, ValidationError} from '../../errors.js'
+import {CyclicDependencyError, ValidationError} from '../errors.js'
 import {
   PipelineLoader,
   slugify,

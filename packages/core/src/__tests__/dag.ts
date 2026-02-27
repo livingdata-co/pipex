@@ -1,6 +1,6 @@
 import test from 'ava'
-import {CyclicDependencyError, ValidationError} from '../../errors.js'
-import type {Step} from '../../types.js'
+import {CyclicDependencyError, ValidationError} from '../errors.js'
+import type {Step} from '../types.js'
 import {buildGraph, validateGraph, topologicalLevels, subgraph, leafNodes} from '../dag.js'
 
 function makeStep(id: string, inputs?: Array<{step: string; optional?: boolean}>): Step {

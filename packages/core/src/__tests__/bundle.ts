@@ -7,8 +7,8 @@ import {buffer as streamToBuffer} from 'node:stream/consumers'
 import {pipeline} from 'node:stream/promises'
 import test from 'ava'
 import * as tar from 'tar'
-import {BundleError} from '../../errors.js'
-import type {Pipeline} from '../../types.js'
+import {BundleError} from '../errors.js'
+import type {Pipeline} from '../types.js'
 import {collectDependencies, buildIgnoreFilter, buildBundle, extractBundle} from '../bundle.js'
 
 // ---------------------------------------------------------------------------

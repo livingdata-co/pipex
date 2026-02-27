@@ -1,7 +1,7 @@
 import {isAbsolute, relative} from 'node:path'
-import {ValidationError} from '../errors.js'
-import {resolveKit, type KitContext, type KitResolveContext} from '../kits/index.js'
-import {isKitStep, type CacheSpec, type KitStepDefinition, type MountSpec, type Step, type StepDefinition} from '../types.js'
+import {ValidationError} from './errors.js'
+import {resolveKit} from './kit-registry.js'
+import {isKitStep, type CacheSpec, type KitContext, type KitResolveContext, type KitStepDefinition, type MountSpec, type Step, type StepDefinition} from './types.js'
 import {slugify, mergeEnv, mergeCaches, mergeMounts, mergeSetup} from './pipeline-loader.js'
 
 /**

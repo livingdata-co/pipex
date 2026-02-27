@@ -1,8 +1,7 @@
 import {readFile} from 'node:fs/promises'
 import {dirname, resolve} from 'node:path'
-import {ValidationError} from '../errors.js'
-import type {KitContext} from '../kits/index.js'
-import type {StepDefinition, Step} from '../types.js'
+import {ValidationError} from './errors.js'
+import type {KitContext, StepDefinition, Step} from './types.js'
 import {parsePipelineFile} from './pipeline-loader.js'
 import {resolveStep, validateStep} from './step-resolver.js'
 

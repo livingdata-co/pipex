@@ -1,6 +1,6 @@
 import test from 'ava'
 import {StateManager} from '../state.js'
-import {createTmpDir} from '../../__tests__/helpers.js'
+import {createTmpDir} from './helpers.js'
 
 // -- load / save round-trip --------------------------------------------------
 

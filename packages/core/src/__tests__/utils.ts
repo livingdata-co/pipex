@@ -1,7 +1,7 @@
 import process from 'node:process'
 import {join} from 'node:path'
 import test from 'ava'
-import {ValidationError} from '../../errors.js'
+import {ValidationError} from '../errors.js'
 import {resolveHostPath} from '../utils.js'
 
 test('resolveHostPath: resolves path within cwd', t => {

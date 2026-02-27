@@ -2,7 +2,7 @@ import {execSync} from 'node:child_process'
 import {mkdtemp} from 'node:fs/promises'
 import {tmpdir} from 'node:os'
 import {join} from 'node:path'
-import type {Reporter, PipelineEvent} from '../core/reporter.js'
+import type {Reporter, PipelineEvent} from '../reporter.js'
 
 /**
  * Creates a temporary directory for test isolation.

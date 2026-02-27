@@ -1,5 +1,5 @@
-import {CyclicDependencyError, ValidationError} from '../errors.js'
-import type {Step} from '../types.js'
+import {CyclicDependencyError, ValidationError} from './errors.js'
+import type {Step} from './types.js'
 
 /** Maps each stepId to its set of dependency stepIds. */
 export type StepGraph = Map<string, Set<string>>

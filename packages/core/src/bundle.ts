@@ -7,8 +7,8 @@ import {Readable} from 'node:stream'
 import {buffer as streamToBuffer} from 'node:stream/consumers'
 import ignore from 'ignore'
 import * as tar from 'tar'
-import {BundleError} from '../errors.js'
-import type {Pipeline} from '../types.js'
+import {BundleError} from './errors.js'
+import type {Pipeline} from './types.js'
 import {PipelineLoader} from './pipeline-loader.js'
 
 const MAX_BUNDLE_SIZE = 50 * 1024 * 1024 // 50 MB

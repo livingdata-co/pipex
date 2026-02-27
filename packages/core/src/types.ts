@@ -153,3 +153,34 @@ export type PipexConfig = {
   /** Kit aliases: maps a short name to a file path or npm module specifier. */
   kits?: Record<string, string>;
 }
+
+// -- Kit types ---------------------------------------------------------------
+
+/** Output of a kit's resolve() method — a partially resolved step. */
+export type KitOutput = Omit<Step, 'id' | 'name' | 'inputs' | 'outputPath' | 'timeoutSec' | 'allowFailure'>
+
+/** Context passed to kit resolve() for companion files and chaining. */
+export type KitResolveContext = {
+  /** Absolute path to the kit's directory (for referencing companion files). */
+  kitDir: string;
+  /** Resolve another kit by name (for kit chaining/composition). */
+  resolveKit: (name: string) => Promise<Kit>;
+}
+
+/** A reusable step template with parameter-based resolution. */
+export type Kit = {
+  name: string;
+  /** Absolute path to the kit's directory (set for external kits). */
+  kitDir?: string;
+  resolve(params: Record<string, unknown>, context?: KitResolveContext): KitOutput | Promise<KitOutput>;
+}
+
+/** Context for resolving kits (project config, working directory, builtin kits). */
+export type KitContext = {
+  /** Project-level config (kit aliases). */
+  config: PipexConfig;
+  /** Working directory (used to locate `kits/` directory). */
+  cwd: string;
+  /** Builtin kits to register (e.g. node, python, shell). */
+  builtins?: Map<string, Kit>;
+}

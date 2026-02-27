@@ -4,7 +4,7 @@ import {mkdir, writeFile} from 'node:fs/promises'
 import {randomUUID} from 'node:crypto'
 import test from 'ava'
 import {resolveStep} from '../step-resolver.js'
-import type {KitContext} from '../../kits/index.js'
+import type {KitContext} from '../types.js'
 
 // ---------------------------------------------------------------------------
 // resolveKitStep — absolute path relativization

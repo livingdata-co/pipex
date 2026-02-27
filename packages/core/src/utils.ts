@@ -1,7 +1,7 @@
 import process from 'node:process'
 import {readdir, stat} from 'node:fs/promises'
 import {join, resolve} from 'node:path'
-import {ValidationError} from '../errors.js'
+import {ValidationError} from './errors.js'
 
 export async function dirSize(dirPath: string): Promise<number> {
   let total = 0
