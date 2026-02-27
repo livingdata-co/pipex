@@ -1,4 +1,5 @@
 import {readFile} from 'node:fs/promises'
+import {dirname, resolve} from 'node:path'
 import {ValidationError} from '../errors.js'
 import type {KitContext} from '../kits/index.js'
 import type {StepDefinition, Step} from '../types.js'
@@ -26,7 +27,8 @@ export async function loadStepFile(filePath: string, stepIdOverride?: string, co
     (raw as Record<string, unknown>).id = stepIdOverride
   }
 
-  const step = await resolveStep(raw, context)
+  const pipelineRoot = dirname(resolve(filePath))
+  const step = await resolveStep(raw, context, pipelineRoot)
   validateStep(step)
   return step
 }

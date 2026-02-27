@@ -1,5 +1,6 @@
+import {isAbsolute, relative} from 'node:path'
 import {ValidationError} from '../errors.js'
-import {resolveKit, type KitContext} from '../kits/index.js'
+import {resolveKit, type KitContext, type KitResolveContext} from '../kits/index.js'
 import {isKitStep, type CacheSpec, type KitStepDefinition, type MountSpec, type Step, type StepDefinition} from '../types.js'
 import {slugify, mergeEnv, mergeCaches, mergeMounts, mergeSetup} from './pipeline-loader.js'
 
@@ -9,8 +10,11 @@ import {slugify, mergeEnv, mergeCaches, mergeMounts, mergeSetup} from './pipelin
  *
  * When a KitContext is provided, user-defined kits are resolved via
  * alias, local `kits/` directory, builtins, or npm modules.
+ *
+ * When pipelineRoot is provided, absolute host paths from kit output
+ * are converted to pipelineRoot-relative paths before validation.
  */
-export async function resolveStep(step: StepDefinition, context?: KitContext): Promise<Step> {
+export async function resolveStep(step: StepDefinition, context?: KitContext, pipelineRoot?: string): Promise<Step> {
   if (!step.id && !step.name) {
     throw new ValidationError('Invalid step: at least one of "id" or "name" must be defined')
   }
@@ -22,12 +26,46 @@ export async function resolveStep(step: StepDefinition, context?: KitContext): P
     return {...step, id, name}
   }
 
-  return resolveKitStep(step, id, name, context)
+  return resolveKitStep(step, id, name, {context, pipelineRoot})
 }
 
-async function resolveKitStep(step: KitStepDefinition, id: string, name: string | undefined, context?: KitContext): Promise<Step> {
+/** Convert absolute host paths to pipelineRoot-relative paths. */
+function relativizeMounts(mounts: MountSpec[] | undefined, pipelineRoot: string): MountSpec[] | undefined {
+  if (!mounts) {
+    return undefined
+  }
+
+  return mounts.map(mount => {
+    if (isAbsolute(mount.host)) {
+      return {...mount, host: relative(pipelineRoot, mount.host)}
+    }
+
+    return mount
+  })
+}
+
+async function resolveKitStep(step: KitStepDefinition, id: string, name: string | undefined, options?: {context?: KitContext; pipelineRoot?: string}): Promise<Step> {
+  const {context, pipelineRoot} = options ?? {}
   const kit = await resolveKit(step.uses, context)
-  const kitOutput = kit.resolve(step.with ?? {})
+
+  // Build KitResolveContext if kit has a kitDir
+  let kitResolveCtx: KitResolveContext | undefined
+  if (kit.kitDir) {
+    kitResolveCtx = {
+      kitDir: kit.kitDir,
+      resolveKit: async (kitName: string) => resolveKit(kitName, context)
+    }
+  }
+
+  const kitOutput = await kit.resolve(step.with ?? {}, kitResolveCtx)
+
+  // Convert absolute host paths from kit output to pipelineRoot-relative
+  let kitMounts = kitOutput.mounts
+  let kitSources = kitOutput.sources
+  if (pipelineRoot) {
+    kitMounts = relativizeMounts(kitMounts, pipelineRoot)
+    kitSources = relativizeMounts(kitSources, pipelineRoot)
+  }
 
   return {
     id,
@@ -40,8 +78,8 @@ async function resolveKitStep(step: KitStepDefinition, id: string, name: string 
     inputs: step.inputs,
     outputPath: step.outputPath,
     caches: mergeCaches(kitOutput.caches, step.caches),
-    mounts: mergeMounts(kitOutput.mounts, step.mounts),
-    sources: mergeMounts(kitOutput.sources, step.sources),
+    mounts: mergeMounts(kitMounts, step.mounts),
+    sources: mergeMounts(kitSources, step.sources),
     timeoutSec: step.timeoutSec,
     allowFailure: step.allowFailure,
     allowNetwork: step.allowNetwork ?? kitOutput.allowNetwork,

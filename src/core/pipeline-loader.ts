@@ -1,5 +1,5 @@
 import {readFile} from 'node:fs/promises'
-import {extname} from 'node:path'
+import {dirname, extname, resolve} from 'node:path'
 import {deburr} from 'lodash-es'
 import {parse as parseYaml} from 'yaml'
 import {ValidationError} from '../errors.js'
@@ -27,7 +27,8 @@ export class PipelineLoader {
       throw new ValidationError('Invalid pipeline: steps must be a non-empty array')
     }
 
-    const steps = await Promise.all(input.steps.map(async step => resolveStep(step, context)))
+    const pipelineRoot = dirname(resolve(filePath))
+    const steps = await Promise.all(input.steps.map(async step => resolveStep(step, context, pipelineRoot)))
 
     for (const step of steps) {
       validateStep(step)

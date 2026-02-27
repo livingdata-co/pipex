@@ -46,7 +46,7 @@ test('resolveKit resolves from alias (config)', async t => {
   }
   const kit = await resolveKit('my-kit', context)
   t.is(kit.name, 'my-kit')
-  const output = kit.resolve({msg: 'hello'})
+  const output = await kit.resolve({msg: 'hello'})
   t.is(output.image, 'test:1')
   t.deepEqual(output.cmd, ['echo', 'hello'])
 })
@@ -67,7 +67,8 @@ test('resolveKit resolves from kits/ directory', async t => {
   const context: KitContext = {config: {}, cwd: dir}
   const kit = await resolveKit('custom', context)
   t.is(kit.name, 'custom')
-  t.is(kit.resolve({}).image, 'custom:latest')
+  const output = await kit.resolve({})
+  t.is(output.image, 'custom:latest')
 })
 
 test('resolveKit local file shadows builtin', async t => {
@@ -81,7 +82,8 @@ test('resolveKit local file shadows builtin', async t => {
 
   const context: KitContext = {config: {}, cwd: dir}
   const kit = await resolveKit('shell', context)
-  t.is(kit.resolve({}).image, 'my-shell:1')
+  const output = await kit.resolve({})
+  t.is(output.image, 'my-shell:1')
 })
 
 // ---------------------------------------------------------------------------
@@ -112,4 +114,75 @@ test('resolveKit throws KIT_LOAD_FAILED on broken alias', async t => {
   const error = await t.throwsAsync(async () => resolveKit('broken', context))
   t.true(error instanceof KitError)
   t.truthy(error?.message.includes('Failed to load kit'))
+})
+
+// ---------------------------------------------------------------------------
+// resolveKit — directory kits (kits/<name>/index.js)
+// ---------------------------------------------------------------------------
+
+test('resolveKit resolves from kits/<name>/index.js directory', async t => {
+  const dir = join(tmpdir(), `pipex-test-${randomUUID()}`)
+  const kitDir = join(dir, 'kits', 'my-dir-kit')
+  await mkdir(kitDir, {recursive: true})
+
+  await writeFile(join(kitDir, 'index.js'), `export default function resolve() {
+    return { image: 'dir-kit:1', cmd: ['run'] }
+  }`, 'utf8')
+
+  const context: KitContext = {config: {}, cwd: dir}
+  const kit = await resolveKit('my-dir-kit', context)
+  t.is(kit.name, 'my-dir-kit')
+  const output = await kit.resolve({})
+  t.is(output.image, 'dir-kit:1')
+})
+
+test('resolveKit directory takes precedence over flat file', async t => {
+  const dir = join(tmpdir(), `pipex-test-${randomUUID()}`)
+  const kitsDir = join(dir, 'kits')
+  const kitSubDir = join(kitsDir, 'dual')
+  await mkdir(kitSubDir, {recursive: true})
+
+  // Flat file
+  await writeFile(join(kitsDir, 'dual.js'), `export default function resolve() {
+    return { image: 'flat:1', cmd: ['flat'] }
+  }`, 'utf8')
+
+  // Directory with index.js (should win)
+  await writeFile(join(kitSubDir, 'index.js'), `export default function resolve() {
+    return { image: 'dir:1', cmd: ['dir'] }
+  }`, 'utf8')
+
+  const context: KitContext = {config: {}, cwd: dir}
+  const kit = await resolveKit('dual', context)
+  const output = await kit.resolve({})
+  t.is(output.image, 'dir:1')
+})
+
+test('loaded kit has kitDir property', async t => {
+  const dir = join(tmpdir(), `pipex-test-${randomUUID()}`)
+  const kitsDir = join(dir, 'kits')
+  const kitSubDir = join(kitsDir, 'with-dir')
+  await mkdir(kitSubDir, {recursive: true})
+
+  await writeFile(join(kitSubDir, 'index.js'), `export default function resolve() {
+    return { image: 'test:1', cmd: ['test'] }
+  }`, 'utf8')
+
+  const context: KitContext = {config: {}, cwd: dir}
+  const kit = await resolveKit('with-dir', context)
+  t.is(kit.kitDir, kitSubDir)
+})
+
+test('loaded flat kit has kitDir pointing to kits/ directory', async t => {
+  const dir = join(tmpdir(), `pipex-test-${randomUUID()}`)
+  const kitsDir = join(dir, 'kits')
+  await mkdir(kitsDir, {recursive: true})
+
+  await writeFile(join(kitsDir, 'flat.js'), `export default function resolve() {
+    return { image: 'flat:1', cmd: ['flat'] }
+  }`, 'utf8')
+
+  const context: KitContext = {config: {}, cwd: dir}
+  const kit = await resolveKit('flat', context)
+  t.is(kit.kitDir, kitsDir)
 })
