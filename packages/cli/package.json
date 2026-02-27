@@ -1,5 +1,5 @@
 {
-  "name": "@livingdata/pipex-cli",
+  "name": "@livingdata/pipex",
   "version": "0.0.10",
   "description": "Pipex CLI — command-line interface for containerized pipeline execution",
   "author": "Jérôme Desboeufs <jerome@livingdata.co>",

@@ -26,31 +26,50 @@ npm run lint:fix                                       # Auto-fix lint issues
 
 ## Architecture
 
-Two-layer design:
+Monorepo with npm workspaces. Three packages: `packages/core`, `packages/kits`, `packages/cli`.
 
-### Engine Layer (`src/engine/`) — Low-level container execution
+### Core (`packages/core/`) — `@livingdata/pipex-core`
+
+Programmatic TypeScript API. No CLI dependency. Dependency graph: core → (no internal deps).
+
+#### Engine (`packages/core/src/engine/`)
 - **workspace.ts** — Manages isolated execution environments with three directory types: `staging/` (temporary write), `runs/` (committed immutable run outputs), `caches/` (persistent read-write shared across steps). Two-phase run lifecycle: prepareRun → commitRun/discardRun. Each run contains `artifacts/`, `stdout.log`, `stderr.log`, and `meta.json`.
 - **docker-executor.ts** — Implements `ContainerExecutor` abstract class using Docker CLI via `execa`. Two execution paths: **simple** (`docker create` + `docker cp` + `docker start -a`) for steps without setup, and **two-phase** (`docker create --entrypoint sleep` + `docker start` + `docker exec` setup + optional `docker network disconnect` + `docker exec` run) for steps with a setup phase. Handles mount configuration (inputs=read-only, output=read-write, caches=read-write, host mounts=read-only, sources=copied into container layer), environment isolation (only PATH/HOME/DOCKER_* forwarded), log streaming via `subprocess.iterable()`, and container cleanup.
 - **executor.ts** — Abstract `ContainerExecutor` base class for pluggable runtimes. The `run()` method accepts an optional `onSetupComplete` callback for releasing cache locks after the setup phase.
 
-### CLI Layer (`src/cli/`) — High-level orchestration
+#### Orchestration (`packages/core/src/`)
 - **pipeline-runner.ts** — Orchestrates DAG-based parallel step execution. Computes SHA256 fingerprints (image + cmd + setup.cmd + env + sorted inputs + mounts) for cache invalidation. Each step execution produces a **run** with artifacts, captured logs (stdout.log/stderr.log), and structured metadata (meta.json). Mounts previous run artifacts as inputs. Supports `allowFailure` and `force` (skip cache) options.
 - **step-runner.ts** — Standalone single-step executor (used by `exec` command). Same caching and execution logic as pipeline-runner but for individual steps.
 - **state.ts** — Persists step fingerprints and run IDs to `state.json` per workspace. Handles cache hit detection and invalidation propagation through dependent steps.
 - **pipeline-loader.ts** — Validates pipeline YAML/JSON configs with security checks (relative host mounts only — `..` allowed but bounded to `process.cwd()` at runtime, absolute container paths, alphanumeric IDs). Provides merge helpers: `mergeEnv`, `mergeCaches`, `mergeMounts`, `mergeSetup`.
 - **cache-lock.ts** — In-memory async mutex (`CacheLockManager`) for exclusive cache access during setup phases. Locks are acquired in sorted order to prevent deadlocks and released via `onSetupComplete` callback.
-- **reporter.ts** — Two implementations: `ConsoleReporter` (structured JSON via Pino) and `InteractiveReporter` (colored spinners via ora/chalk).
-- **index.ts** — CLI entry point using Commander.js.
+- **kit-registry.ts** — Kit resolution logic (`resolveKit`, `loadExternalKit`). Resolves from `KitContext.builtins`, local files/dirs, aliases, or npm modules. Builtins are injected via context (not hardcoded).
+- **reporter.ts** — `ConsoleReporter` implementation (structured JSON via Pino).
 
-### Kits Layer (`src/kits/`) — Reusable step templates
-- **index.ts** — Kit registry. A `Kit` has a `name` and a `resolve(params)` method that returns a `KitOutput` (image, cmd, setup, env, caches, mounts, sources, allowNetwork). Kits are selected via `uses` in pipeline definitions.
-- **builtin/shell.ts** — General-purpose shell command runner. Without `packages`: alpine, no network, no setup. With `packages`: debian image, setup phase runs `apt-get install` with exclusive `apt-cache` and network access, run phase executes the user command.
-- **builtin/node.ts** — Node.js script runner. When `install` is true (default), setup phase runs npm/pnpm/yarn install with exclusive package manager cache and network access, run phase executes the script/command.
-- **builtin/python.ts** — Python script runner. When `install` is true (default), setup phase runs pip/uv install with exclusive package manager cache and network access, run phase executes the script/command.
+#### Types and Errors (`packages/core/src/`)
+- **types.ts** — All domain types including `Kit`, `KitOutput`, `KitContext`, `KitResolveContext`, `Step`, `Pipeline`, `PipexConfig`.
+- **errors.ts** — Structured error hierarchy: `PipexError` → `DockerError`, `WorkspaceError`, `PipelineError`, `KitError`.
+
+### Kits (`packages/kits/`) — `@livingdata/pipex-kits`
+
+Built-in kit implementations. Serves as an example for external kit packages. Dependency: core.
+
+- **shell.ts** — General-purpose shell command runner. Without `packages`: alpine, no network, no setup. With `packages`: debian image, setup phase runs `apt-get install` with exclusive `apt-cache` and network access, run phase executes the user command.
+- **node.ts** — Node.js script runner. When `install` is true (default), setup phase runs npm/pnpm/yarn install with exclusive package manager cache and network access, run phase executes the script/command.
+- **python.ts** — Python script runner. When `install` is true (default), setup phase runs pip/uv install with exclusive package manager cache and network access, run phase executes the script/command.
+- **index.ts** — Exports `builtinKits` map and individual kit objects.
 
 Kits use a **two-phase execution model**: the `setup` phase handles dependency installation (with exclusive cache locking and network access), and the `cmd` phase runs the actual command (parallel-safe, isolated). This prevents cache corruption when multiple steps share a package manager cache.
 
-Kit resolution happens in `resolveKitStep()` (`step-resolver.ts`): `uses` selects the kit, `with` passes parameters, and user-level `env`/`caches`/`mounts`/`sources`/`setup` merge with kit defaults (user values win). The `node` kit uses `sources` (not `mounts`) for `src` so that `node_modules` can be created alongside source files in the container's writable layer.
+Kit resolution happens in `resolveKitStep()` (`packages/core/src/step-resolver.ts`): `uses` selects the kit, `with` passes parameters, and user-level `env`/`caches`/`mounts`/`sources`/`setup` merge with kit defaults (user values win). The `node` kit uses `sources` (not `mounts`) for `src` so that `node_modules` can be created alongside source files in the container's writable layer.
+
+### CLI (`packages/cli/`) — `@livingdata/pipex`
+
+CLI entry point and interactive reporter. Dependencies: core + kits.
+
+- **commands/** — Commander.js command handlers (`run`, `exec`, `show`, `logs`, `inspect`, `export`, `cat`, `list`, `prune`, `rm`, `rm-step`, `clean`). Each wires `builtinKits` from `@livingdata/pipex-kits` into `KitContext`.
+- **interactive-reporter.ts** — `InteractiveReporter` (colored spinners via chalk/log-update).
+- **index.ts** — CLI entry point using Commander.js.
 
 ### Execution Flow
 ```
