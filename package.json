@@ -5,7 +5,8 @@
   "author": "Jérôme Desboeufs <jerome@livingdata.co>",
   "type": "module",
   "workspaces": [
-    "packages/*"
+    "packages/core",
+    "packages/cli"
   ],
   "repository": {
     "type": "git",
@@ -14,7 +15,7 @@
   "homepage": "https://github.com/livingdata-co/pipex#readme",
   "scripts": {
     "cli": "tsx packages/cli/src/index.ts",
-    "build": "tsc --build packages/core packages/kits packages/cli",
+    "build": "tsc --build packages/core packages/cli",
     "test": "npm test --workspaces",
     "lint": "xo",
     "lint:fix": "xo --fix"

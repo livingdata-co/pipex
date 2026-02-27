@@ -2,8 +2,7 @@ import process from 'node:process'
 import {randomUUID} from 'node:crypto'
 import {dirname, resolve} from 'node:path'
 import type {Command} from 'commander'
-import {DockerCliExecutor, Workspace, loadStepFile, StepRunner, StateManager, ConsoleReporter, type JobContext} from '@livingdata/pipex-core'
-import {builtinKits} from '@livingdata/pipex-kits'
+import {DockerCliExecutor, Workspace, Pipex, StateManager, ConsoleReporter, type JobContext} from '@livingdata/pipex-core'
 import {InteractiveReporter} from '../interactive-reporter.js'
 import {loadConfig} from '../config.js'
 import {getGlobalOptions} from '../utils.js'
@@ -33,9 +32,9 @@ export function registerExecCommand(program: Command): void {
       // Load step from file
       const cwd = process.cwd()
       const config = await loadConfig(cwd)
-      const kitContext = {config, cwd, builtins: builtinKits}
+      const pipex = new Pipex({runtime, reporter, workdir: workdirRoot, config, cwd})
       const stepFilePath = resolve(options.file)
-      const step = await loadStepFile(stepFilePath, options.step, kitContext)
+      const step = await pipex.loadStep(stepFilePath, options.step)
       const pipelineRoot = dirname(stepFilePath)
 
       // Open or create workspace
@@ -92,8 +91,7 @@ export function registerExecCommand(program: Command): void {
       }
 
       const job: JobContext = {workspaceId: workspace.id, jobId: randomUUID()}
-      const runner = new StepRunner(runtime, reporter)
-      await runner.run({
+      await pipex.stepRunner.run({
         workspace,
         state,
         step,

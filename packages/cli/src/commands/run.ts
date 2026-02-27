@@ -1,8 +1,7 @@
 import process from 'node:process'
 import {resolve} from 'node:path'
 import type {Command} from 'commander'
-import {DockerCliExecutor, PipelineLoader, PipelineRunner, ConsoleReporter} from '@livingdata/pipex-core'
-import {builtinKits} from '@livingdata/pipex-kits'
+import {DockerCliExecutor, Pipex, ConsoleReporter} from '@livingdata/pipex-core'
 import {InteractiveReporter} from '../interactive-reporter.js'
 import {loadConfig} from '../config.js'
 import {getGlobalOptions, resolvePipelineFile} from '../utils.js'
@@ -24,13 +23,11 @@ export function registerRunCommand(program: Command): void {
       const {workdir, json} = getGlobalOptions(cmd)
       const cwd = process.cwd()
       const config = await loadConfig(cwd)
-      const kitContext = {config, cwd, builtins: builtinKits}
-      const workdirRoot = resolve(workdir)
-      const loader = new PipelineLoader()
       const runtime = new DockerCliExecutor()
-
       const reporter = json ? new ConsoleReporter() : new InteractiveReporter({verbose: options.verbose})
-      const runner = new PipelineRunner(loader, runtime, reporter, workdirRoot)
+      const workdirRoot = resolve(workdir)
+
+      const pipex = new Pipex({runtime, reporter, workdir: workdirRoot, config, cwd})
 
       const onSignal = (signal: NodeJS.Signals) => {
         void (async () => {
@@ -47,7 +44,8 @@ export function registerRunCommand(program: Command): void {
           ? true
           : (typeof options.force === 'string' ? options.force.split(',') : undefined)
         const target = options.target ? options.target.split(',') : undefined
-        await runner.run(pipelineFile, {workspace: options.workspace, force, dryRun: options.dryRun, target, concurrency: options.concurrency, envFile: options.envFile, kitContext})
+        const pipeline = await pipex.load(pipelineFile)
+        await pipex.run(pipeline, {workspace: options.workspace, force, dryRun: options.dryRun, target, concurrency: options.concurrency, envFile: options.envFile})
         if (json) {
           console.log('Pipeline completed')
         }
