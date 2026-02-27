@@ -144,7 +144,7 @@ steps:
     inputs: [{ step: transform }]
 ```
 
-See [`@livingdata/pipex-kits`](../kits/) for available kits and parameters.
+See [`@livingdata/pipex-core`](../core/) for available kits and parameters.
 
 ### Pipeline and Step Identity
 

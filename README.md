@@ -52,13 +52,12 @@ pipex run pipeline.yaml
 
 ## Packages
 
-This is a monorepo with three packages:
+This is a monorepo with two packages:
 
 | Package | npm | Description |
 |---------|-----|-------------|
 | [`@livingdata/pipex`](packages/cli/) | CLI | Command-line interface, interactive reporter |
-| [`@livingdata/pipex-core`](packages/core/) | Library | Programmatic TypeScript API: engine, orchestration, types |
-| [`@livingdata/pipex-kits`](packages/kits/) | Kits | Built-in kit implementations (shell, node, python) |
+| [`@livingdata/pipex-core`](packages/core/) | Library | Programmatic TypeScript API: engine, orchestration, built-in kits, types |
 
 ## Examples
 

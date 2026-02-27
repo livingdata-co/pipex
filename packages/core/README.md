@@ -13,31 +13,41 @@ npm install @livingdata/pipex-core
 ## Usage
 
 ```typescript
-import {
-  PipelineRunner,
-  PipelineLoader,
-  Workspace,
-  DockerCliExecutor,
-  ConsoleReporter,
-  resolveKit,
-  type KitContext
-} from '@livingdata/pipex-core'
+import {Pipex, DockerCliExecutor, ConsoleReporter} from '@livingdata/pipex-core'
 
-// Load and validate a pipeline
-const loader = new PipelineLoader()
-const pipeline = await loader.load('./pipeline.yaml', kitContext)
+// Built-in kits (shell, node, python) are always available
+const pipex = new Pipex({
+  runtime: new DockerCliExecutor(),
+  reporter: new ConsoleReporter(),
+  workdir: './workdir'
+})
 
-// Create workspace and executor
-const workspace = await Workspace.create('./workdir', 'my-pipeline')
-const executor = new DockerCliExecutor()
-const reporter = new ConsoleReporter()
+// Load from file or JS object
+const pipeline = await pipex.load('./pipeline.yaml')
+const pipeline = await pipex.load({
+  id: 'my-pipeline',
+  steps: [{id: 'greet', uses: 'shell', with: {run: 'echo hello'}}]
+})
 
-// Run the pipeline
-const runner = new PipelineRunner({workspace, executor, reporter})
-await runner.run(pipeline)
+// Run the pipeline (all steps, or targeted)
+await pipex.run(pipeline)
+await pipex.run(pipeline, {target: ['greet']})
+
+// Add custom kits
+const pipex = new Pipex({
+  workdir: './workdir',
+  kits: [{
+    name: 'rust',
+    resolve: (params) => ({image: `rust:${params.version ?? '1'}`, cmd: ['cargo', 'run']})
+  }]
+})
 ```
 
 ## Main Exports
+
+### Pipex Facade
+
+- **`Pipex`** — Main entry point. Configure once, load pipelines from files or JS objects, run them. Built-in kits always available.
 
 ### Engine
 
@@ -47,15 +57,20 @@ await runner.run(pipeline)
 
 ### Orchestration
 
-- **`PipelineRunner`** — DAG-based parallel step execution with fingerprint caching
+- **`PipelineRunner`** — DAG-based parallel step execution with fingerprint caching. Takes a `Pipeline` object.
 - **`StepRunner`** — Single-step executor for interactive/exploratory workflows
-- **`PipelineLoader`** — Validates pipeline YAML/JSON configs, resolves kit steps
+- **`PipelineLoader`** — Constructor takes optional `KitContext`. Loads from file paths or JS objects (`PipelineDefinition`). Also provides `loadStep()`.
 - **`StateManager`** — Persists step fingerprints and run IDs for cache hit detection
 - **`CacheLockManager`** — In-memory async mutex for exclusive cache access during setup phases
 
+### Built-in Kits
+
+- **`defaultKits`** — Map of all built-in kits (shell, node, python)
+- **`shellKit`**, **`nodeKit`**, **`pythonKit`** — Individual kit objects
+
 ### Kit Registry
 
-- **`resolveKit(name, context)`** — Resolves a kit by name: builtins, local files/dirs, aliases, or npm modules
+- **`resolveKit(name, context?)`** — Resolves a kit by name: alias → local dir → local file → custom kits → built-in defaults → npm module
 - **`loadExternalKit(specifier, cwd)`** — Loads a kit from a file path or npm specifier
 
 ### DAG Utilities
