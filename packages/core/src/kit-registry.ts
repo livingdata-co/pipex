@@ -2,6 +2,7 @@ import {createRequire} from 'node:module'
 import {pathToFileURL} from 'node:url'
 import {dirname, join, resolve} from 'node:path'
 import {KitError} from './errors.js'
+import {defaultKits} from './kits/index.js'
 import type {Kit, KitContext} from './types.js'
 
 /**
@@ -9,9 +10,11 @@ import type {Kit, KitContext} from './types.js'
  *
  * Resolution order (when context is provided):
  * 1. Alias — `context.config.kits[name]` → load external kit from the target
- * 2. Local file — `${context.cwd}/kits/${name}.js`
- * 3. Builtin — `context.builtins` registry (node, python, shell…)
- * 4. npm module — `import(name)` (only when name contains `/` or starts with `@`)
+ * 2. Local directory — `${context.cwd}/kits/${name}/index.js`
+ * 3. Local file — `${context.cwd}/kits/${name}.js`
+ * 4. Custom kits — `context.kits` (user-provided kits)
+ * 5. Builtin — `defaultKits` (always available)
+ * 6. npm module — `import(name)` (only when name contains `/` or starts with `@`)
  *
  * Without context, only builtins are available.
  */
@@ -43,26 +46,34 @@ export async function resolveKit(name: string, context?: KitContext): Promise<Ki
         throw error
       }
 
-      // Fall through to builtins
+      // Fall through to custom kits
     }
 
-    // 3. Builtin from context
-    const builtin = context.builtins?.get(name)
-    if (builtin) {
-      return builtin
+    // 3. Custom kits from context
+    const custom = context.kits?.get(name)
+    if (custom) {
+      return custom
     }
+  }
 
-    // 4. npm module (only for scoped packages or paths with /)
+  // 4. Builtin (always available, no context needed)
+  const builtin = defaultKits.get(name)
+  if (builtin) {
+    return builtin
+  }
+
+  if (context) {
+    // 5. npm module (only for scoped packages or paths with /)
     if (name.includes('/') || name.startsWith('@')) {
       return loadExternalKit(name, name, context.cwd)
     }
 
-    const available = context.builtins ? [...context.builtins.keys()].join(', ') : '(none)'
+    const available = [...defaultKits.keys(), ...(context.kits ? [...context.kits.keys()] : [])].join(', ')
     throw new KitError('UNKNOWN_KIT', `Unknown kit: "${name}". Available kits: ${available}`)
   }
 
-  // No context — no resolution possible
-  throw new KitError('UNKNOWN_KIT', `Unknown kit: "${name}". No context provided for kit resolution.`)
+  // No context — only builtins were checked
+  throw new KitError('UNKNOWN_KIT', `Unknown kit: "${name}". Available kits: ${[...defaultKits.keys()].join(', ')}`)
 }
 
 /**

@@ -88,6 +88,8 @@ export type Pipeline = {
   /** Human-readable display name. Falls back to `id` when absent. */
   name?: string;
   steps: Step[];
+  /** Absolute path to the pipeline's root directory (where the pipeline file lives). */
+  root: string;
 }
 
 // -- Definition types (before kit resolution) -------------------------------
@@ -175,12 +177,12 @@ export type Kit = {
   resolve(params: Record<string, unknown>, context?: KitResolveContext): KitOutput | Promise<KitOutput>;
 }
 
-/** Context for resolving kits (project config, working directory, builtin kits). */
+/** Context for resolving kits (project config, working directory, custom kits). */
 export type KitContext = {
   /** Project-level config (kit aliases). */
   config: PipexConfig;
   /** Working directory (used to locate `kits/` directory). */
   cwd: string;
-  /** Builtin kits to register (e.g. node, python, shell). */
-  builtins?: Map<string, Kit>;
+  /** Custom kits added by the user (merged with built-in defaults). */
+  kits?: Map<string, Kit>;
 }
