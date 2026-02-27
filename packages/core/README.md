@@ -28,6 +28,26 @@ const pipeline = await pipex.load({
 // Run the pipeline (all steps, or targeted)
 await pipex.run(pipeline)
 await pipex.run(pipeline, {target: ['greet']})
+
+// Execute a single step in a workspace
+const step = await pipex.loadStep('./step.yaml')
+await pipex.exec('my-workspace', step, {inputs: ['download']})
+
+// Workspace operations
+const workspaces = await pipex.workspaces()             // list all
+await pipex.removeWorkspace('old-build')                // remove
+await pipex.clean()                                     // remove all
+
+const ws = await pipex.workspace('my-workspace')        // open existing
+const info = await ws.show()                            // list steps
+const logs = await ws.logs('download')                  // read logs
+const meta = await ws.inspect('download')               // read metadata
+const entries = await ws.listArtifacts('download')      // list artifacts
+const buf = await ws.readArtifact('download', 'out.csv')// read artifact
+await ws.exportArtifacts('download', './output')        // export to host
+await ws.prune()                                        // remove old runs
+await ws.removeStep('download')                         // remove step
+await ws.remove()                                       // remove workspace
 ```
 
 All options are optional:
@@ -46,7 +66,8 @@ const pipex = new Pipex({
 
 ### Pipex Facade
 
-- **`Pipex`** — Main entry point. Configure once, load pipelines from files or JS objects, run them. Built-in kits always available.
+- **`Pipex`** — Main entry point. Configure once, load/run pipelines, exec single steps, manage workspaces. Built-in kits always available.
+- **`PipexWorkspace`** — Workspace handle returned by `pipex.workspace()`. Provides show, logs, inspect, artifact read/export, prune, remove operations.
 
 ### Engine
 

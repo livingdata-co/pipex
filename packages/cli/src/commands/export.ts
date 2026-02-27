@@ -1,9 +1,7 @@
-import process from 'node:process'
-import {cp} from 'node:fs/promises'
 import {resolve} from 'node:path'
 import chalk from 'chalk'
 import type {Command} from 'commander'
-import {Workspace, StateManager} from '@livingdata/pipex-core'
+import {Pipex} from '@livingdata/pipex-core'
 import {getGlobalOptions} from '../utils.js'
 
 export function registerExportCommand(program: Command): void {
@@ -17,20 +15,11 @@ export function registerExportCommand(program: Command): void {
       const {workdir} = getGlobalOptions(cmd)
       const workdirRoot = resolve(workdir)
 
-      const workspace = await Workspace.open(workdirRoot, workspaceName)
-      const state = new StateManager(workspace.root)
-      await state.load()
+      const pipex = new Pipex({workdir: workdirRoot})
+      const ws = await pipex.workspace(workspaceName)
 
-      const stepState = state.getStep(stepId)
-      if (!stepState) {
-        console.error(chalk.red(`No run found for step: ${stepId}`))
-        process.exitCode = 1
-        return
-      }
-
-      const artifactsPath = workspace.runArtifactsPath(stepState.runId)
       const destPath = resolve(dest)
-      await cp(artifactsPath, destPath, {recursive: true})
+      await ws.exportArtifacts(stepId, destPath)
       console.log(chalk.green(`Exported artifacts from ${stepId} to ${destPath}`))
     })
 }

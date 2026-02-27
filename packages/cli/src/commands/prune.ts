@@ -1,7 +1,7 @@
 import {resolve} from 'node:path'
 import chalk from 'chalk'
 import type {Command} from 'commander'
-import {Workspace, StateManager} from '@livingdata/pipex-core'
+import {Pipex} from '@livingdata/pipex-core'
 import {getGlobalOptions} from '../utils.js'
 
 export function registerPruneCommand(program: Command): void {
@@ -13,12 +13,9 @@ export function registerPruneCommand(program: Command): void {
       const {workdir} = getGlobalOptions(cmd)
       const workdirRoot = resolve(workdir)
 
-      const workspace = await Workspace.open(workdirRoot, workspaceName)
-      const state = new StateManager(workspace.root)
-      await state.load()
-
-      const activeIds = state.activeRunIds()
-      const removed = await workspace.pruneRuns(activeIds)
+      const pipex = new Pipex({workdir: workdirRoot})
+      const ws = await pipex.workspace(workspaceName)
+      const {removed} = await ws.prune()
 
       if (removed === 0) {
         console.log(chalk.gray('No old runs to remove.'))

@@ -1,9 +1,8 @@
 import process from 'node:process'
-import {readFile, readdir, stat} from 'node:fs/promises'
-import {join, resolve} from 'node:path'
+import {resolve} from 'node:path'
 import chalk from 'chalk'
 import type {Command} from 'commander'
-import {Workspace, StateManager} from '@livingdata/pipex-core'
+import {Pipex} from '@livingdata/pipex-core'
 import {getGlobalOptions} from '../utils.js'
 
 export function registerCatCommand(program: Command): void {
@@ -17,39 +16,19 @@ export function registerCatCommand(program: Command): void {
       const {workdir} = getGlobalOptions(cmd)
       const workdirRoot = resolve(workdir)
 
-      const workspace = await Workspace.open(workdirRoot, workspaceName)
-      const state = new StateManager(workspace.root)
-      await state.load()
-
-      const stepState = state.getStep(stepId)
-      if (!stepState) {
-        console.error(chalk.red(`No run found for step: ${stepId}`))
-        process.exitCode = 1
-        return
-      }
-
-      const artifactsDir = workspace.runArtifactsPath(stepState.runId)
-      const targetPath = artifactPath ? join(artifactsDir, artifactPath) : artifactsDir
-
-      // Prevent path traversal
-      if (!targetPath.startsWith(artifactsDir)) {
-        console.error(chalk.red('Invalid path: must be within artifacts directory'))
-        process.exitCode = 1
-        return
-      }
+      const pipex = new Pipex({workdir: workdirRoot})
+      const ws = await pipex.workspace(workspaceName)
 
       try {
-        const info = await stat(targetPath)
-
-        if (info.isDirectory()) {
-          const entries = await readdir(targetPath, {withFileTypes: true})
+        if (artifactPath) {
+          const content = await ws.readArtifact(stepId, artifactPath)
+          process.stdout.write(content)
+        } else {
+          const entries = await ws.listArtifacts(stepId)
           for (const entry of entries) {
-            const suffix = entry.isDirectory() ? '/' : ''
+            const suffix = entry.type === 'directory' ? '/' : ''
             console.log(entry.name + suffix)
           }
-        } else {
-          const content = await readFile(targetPath)
-          process.stdout.write(content)
         }
       } catch {
         console.error(chalk.red(`Not found: ${artifactPath ?? '(artifacts directory)'}`))

@@ -1,8 +1,7 @@
 import process from 'node:process'
-import {randomUUID} from 'node:crypto'
 import {dirname, resolve} from 'node:path'
 import type {Command} from 'commander'
-import {DockerCliExecutor, Workspace, Pipex, StateManager, ConsoleReporter, type JobContext} from '@livingdata/pipex-core'
+import {DockerCliExecutor, Pipex, ConsoleReporter} from '@livingdata/pipex-core'
 import {InteractiveReporter} from '../interactive-reporter.js'
 import {loadConfig} from '../config.js'
 import {getGlobalOptions} from '../utils.js'
@@ -29,25 +28,11 @@ export function registerExecCommand(program: Command): void {
       const runtime = new DockerCliExecutor()
       const reporter = json ? new ConsoleReporter() : new InteractiveReporter({verbose: options.verbose})
 
-      // Load step from file
       const cwd = process.cwd()
       const config = await loadConfig(cwd)
       const pipex = new Pipex({runtime, reporter, workdir: workdirRoot, config, cwd})
       const stepFilePath = resolve(options.file)
       const step = await pipex.loadStep(stepFilePath, options.step)
-      const pipelineRoot = dirname(stepFilePath)
-
-      // Open or create workspace
-      let workspace: Workspace
-      try {
-        workspace = await Workspace.open(workdirRoot, workspaceName)
-      } catch {
-        workspace = await Workspace.create(workdirRoot, workspaceName)
-      }
-
-      await workspace.cleanupStaging()
-      await runtime.check()
-      await runtime.cleanupContainers(workspace.id)
 
       const onSignal = (signal: NodeJS.Signals) => {
         void (async () => {
@@ -59,56 +44,11 @@ export function registerExecCommand(program: Command): void {
       process.once('SIGINT', onSignal)
       process.once('SIGTERM', onSignal)
 
-      // Load state and resolve inputs
-      const state = new StateManager(workspace.root)
-      await state.load()
-
-      const inputs = new Map<string, string>()
-      if (options.input) {
-        for (const spec of options.input) {
-          const {alias, stepId} = parseInputSpec(spec)
-          const stepState = state.getStep(stepId)
-          if (!stepState) {
-            console.error(`No run found for input step: ${stepId}`)
-            process.exitCode = 1
-            return
-          }
-
-          inputs.set(alias, stepState.runId)
-        }
-      }
-
-      // Merge parsed inputs into step.inputs
-      if (inputs.size > 0 && !step.inputs) {
-        step.inputs = []
-      }
-
-      for (const [alias, _runId] of inputs) {
-        // Only add if not already declared in step file
-        if (!step.inputs!.some(i => i.step === alias)) {
-          step.inputs!.push({step: alias})
-        }
-      }
-
-      const job: JobContext = {workspaceId: workspace.id, jobId: randomUUID()}
-      await pipex.stepRunner.run({
-        workspace,
-        state,
-        step,
-        inputs,
-        pipelineRoot,
-        force: options.force,
+      await pipex.exec(workspaceName, step, {
+        inputs: options.input,
         ephemeral: options.ephemeral,
-        job
+        force: options.force,
+        pipelineRoot: dirname(stepFilePath)
       })
     })
-}
-
-function parseInputSpec(spec: string): {alias: string; stepId: string} {
-  const eqIdx = spec.indexOf('=')
-  if (eqIdx > 0) {
-    return {alias: spec.slice(0, eqIdx), stepId: spec.slice(eqIdx + 1)}
-  }
-
-  return {alias: spec, stepId: spec}
 }

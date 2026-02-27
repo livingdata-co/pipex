@@ -1,9 +1,8 @@
 import process from 'node:process'
-import {readFile} from 'node:fs/promises'
-import {join, resolve} from 'node:path'
+import {resolve} from 'node:path'
 import chalk from 'chalk'
 import type {Command} from 'commander'
-import {Workspace, StateManager} from '@livingdata/pipex-core'
+import {Pipex} from '@livingdata/pipex-core'
 import {getGlobalOptions} from '../utils.js'
 
 export function registerInspectCommand(program: Command): void {
@@ -16,24 +15,15 @@ export function registerInspectCommand(program: Command): void {
       const {workdir, json} = getGlobalOptions(cmd)
       const workdirRoot = resolve(workdir)
 
-      const workspace = await Workspace.open(workdirRoot, workspaceName)
-      const state = new StateManager(workspace.root)
-      await state.load()
+      const pipex = new Pipex({workdir: workdirRoot})
+      const ws = await pipex.workspace(workspaceName)
 
-      const stepState = state.getStep(stepId)
-      if (!stepState) {
-        console.error(chalk.red(`No run found for step: ${stepId}`))
-        process.exitCode = 1
-        return
-      }
-
-      const metaPath = join(workspace.runPath(stepState.runId), 'meta.json')
       try {
-        const content = await readFile(metaPath, 'utf8')
+        const meta = await ws.inspect(stepId)
+
         if (json) {
-          console.log(content)
+          console.log(JSON.stringify(meta, null, 2))
         } else {
-          const meta = JSON.parse(content) as Record<string, unknown>
           console.log(chalk.bold(`\nRun: ${chalk.cyan(meta.runId as string)}`))
           console.log(`  Step:       ${meta.stepId as string}${meta.stepName ? ` (${meta.stepName as string})` : ''}`)
           console.log(`  Status:     ${meta.status === 'success' ? chalk.green('success') : chalk.red('failure')}`)
@@ -55,7 +45,7 @@ export function registerInspectCommand(program: Command): void {
           console.log()
         }
       } catch {
-        console.error(chalk.red(`No metadata found for run: ${stepState.runId}`))
+        console.error(chalk.red(`No metadata found for step: ${stepId}`))
         process.exitCode = 1
       }
     })

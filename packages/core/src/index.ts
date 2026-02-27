@@ -6,10 +6,11 @@ export type {BindMount, InputMount, OutputMount, CacheMount, SetupPhase, RunCont
 
 // Pipex facade
 export {Pipex, type PipexOptions} from './pipex.js'
+export {PipexWorkspace, type WorkspaceInfo, type StepInfo, type RunMeta, type ArtifactEntry} from './pipex-workspace.js'
 
 // Pipeline orchestration
 export {PipelineRunner} from './pipeline-runner.js'
-export {StepRunner} from './step-runner.js'
+export {StepRunner, type StepRunResult} from './step-runner.js'
 export {PipelineLoader, slugify, parsePipelineFile, mergeEnv, mergeCaches, mergeMounts, mergeSetup} from './pipeline-loader.js'
 export {resolveStep, validateStep} from './step-resolver.js'
 export {StateManager} from './state.js'

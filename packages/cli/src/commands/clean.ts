@@ -1,7 +1,7 @@
 import {resolve} from 'node:path'
 import chalk from 'chalk'
 import type {Command} from 'commander'
-import {Workspace} from '@livingdata/pipex-core'
+import {Pipex, Workspace} from '@livingdata/pipex-core'
 import {getGlobalOptions} from '../utils.js'
 
 export function registerCleanCommand(program: Command): void {
@@ -11,6 +11,7 @@ export function registerCleanCommand(program: Command): void {
     .action(async (_options: Record<string, unknown>, cmd: Command) => {
       const {workdir} = getGlobalOptions(cmd)
       const workdirRoot = resolve(workdir)
+
       const names = await Workspace.list(workdirRoot)
 
       if (names.length === 0) {
@@ -18,9 +19,8 @@ export function registerCleanCommand(program: Command): void {
         return
       }
 
-      for (const name of names) {
-        await Workspace.remove(workdirRoot, name)
-      }
+      const pipex = new Pipex({workdir: workdirRoot})
+      await pipex.clean()
 
       console.log(chalk.green(`Removed ${names.length} workspace${names.length > 1 ? 's' : ''}.`))
     })
