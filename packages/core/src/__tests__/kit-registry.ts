@@ -7,23 +7,28 @@ import {KitError} from '../errors.js'
 import type {Kit, KitContext} from '../types.js'
 import {resolveKit} from '../kit-registry.js'
 
-// -- Test builtin kit for use in tests ----------------------------------------
+// -- Test custom kit for use in tests -----------------------------------------
 
 const fakeKit: Kit = {
-  name: 'shell',
+  name: 'custom',
   resolve() {
-    return {image: 'alpine:3.20', cmd: ['sh', '-c', 'echo hi']}
+    return {image: 'custom:1', cmd: ['echo', 'custom']}
   }
 }
 
-const builtins = new Map<string, Kit>([['shell', fakeKit]])
+const kits = new Map<string, Kit>([['custom', fakeKit]])
 
 // ---------------------------------------------------------------------------
-// resolveKit — builtin resolution
+// resolveKit — builtin resolution (always available)
 // ---------------------------------------------------------------------------
 
-test('resolveKit returns builtin from context.builtins', async t => {
-  const context: KitContext = {config: {}, cwd: '/tmp', builtins}
+test('resolveKit returns builtin without context', async t => {
+  const kit = await resolveKit('shell')
+  t.is(kit.name, 'shell')
+})
+
+test('resolveKit returns builtin with context', async t => {
+  const context: KitContext = {config: {}, cwd: '/tmp'}
   const kit = await resolveKit('shell', context)
   t.is(kit.name, 'shell')
 })
@@ -34,11 +39,21 @@ test('resolveKit throws on unknown kit without context', async t => {
   t.truthy(error?.message.includes('Unknown kit'))
 })
 
-test('resolveKit throws on unknown kit with context but no matching builtin', async t => {
-  const context: KitContext = {config: {}, cwd: '/tmp', builtins}
+test('resolveKit throws on unknown kit with context but no matching kit', async t => {
+  const context: KitContext = {config: {}, cwd: '/tmp', kits}
   const error = await t.throwsAsync(async () => resolveKit('unknown', context))
   t.true(error instanceof KitError)
   t.truthy(error?.message.includes('Unknown kit'))
+})
+
+// ---------------------------------------------------------------------------
+// resolveKit — custom kits from context
+// ---------------------------------------------------------------------------
+
+test('resolveKit returns custom kit from context.kits', async t => {
+  const context: KitContext = {config: {}, cwd: '/tmp', kits}
+  const kit = await resolveKit('custom', context)
+  t.is(kit.name, 'custom')
 })
 
 // ---------------------------------------------------------------------------
@@ -74,13 +89,13 @@ test('resolveKit resolves from kits/ directory', async t => {
   const kitsDir = join(dir, 'kits')
   await mkdir(kitsDir, {recursive: true})
 
-  await writeFile(join(kitsDir, 'custom.js'), `export default function resolve() {
+  await writeFile(join(kitsDir, 'custom-file.js'), `export default function resolve() {
     return { image: 'custom:latest', cmd: ['run'] }
   }`, 'utf8')
 
   const context: KitContext = {config: {}, cwd: dir}
-  const kit = await resolveKit('custom', context)
-  t.is(kit.name, 'custom')
+  const kit = await resolveKit('custom-file', context)
+  t.is(kit.name, 'custom-file')
   const output = await kit.resolve({})
   t.is(output.image, 'custom:latest')
 })
@@ -94,7 +109,7 @@ test('resolveKit local file shadows builtin', async t => {
     return { image: 'my-shell:1', cmd: ['sh'] }
   }`, 'utf8')
 
-  const context: KitContext = {config: {}, cwd: dir, builtins}
+  const context: KitContext = {config: {}, cwd: dir}
   const kit = await resolveKit('shell', context)
   const output = await kit.resolve({})
   t.is(output.image, 'my-shell:1')

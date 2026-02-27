@@ -13,6 +13,8 @@ import {createTmpDir, isDockerAvailable, noopReporter, recordingReporter} from '
 const hasDocker = isDockerAvailable()
 const dockerTest = hasDocker ? test : test.skip
 
+const loader = new PipelineLoader()
+
 // -- helpers -----------------------------------------------------------------
 
 async function writePipeline(dir: string, config: Record<string, unknown>): Promise<string> {
@@ -36,7 +38,8 @@ dockerTest('step B reads step A output via inputs', async t => {
   })
 
   const {reporter, events} = recordingReporter()
-  await new PipelineRunner(new PipelineLoader(), new DockerCliExecutor(), reporter, workdir).run(pipelinePath)
+  const pipeline = await loader.load(pipelinePath)
+  await new PipelineRunner(new DockerCliExecutor(), reporter, workdir).run(pipeline)
 
   // Both steps should have finished (not just "not crashed")
   const finished = events.filter((e): e is StepFinishedEvent => e.event === 'STEP_FINISHED')
@@ -64,15 +67,15 @@ dockerTest('re-running same pipeline skips all steps (cached)', async t => {
     ]
   })
 
-  const loader = new PipelineLoader()
   const executor = new DockerCliExecutor()
+  const pipeline = await loader.load(pipelinePath)
 
   // First run — executes
-  await new PipelineRunner(loader, executor, noopReporter, workdir).run(pipelinePath)
+  await new PipelineRunner(executor, noopReporter, workdir).run(pipeline)
 
   // Second run — should skip
   const {reporter, events} = recordingReporter()
-  await new PipelineRunner(loader, executor, reporter, workdir).run(pipelinePath)
+  await new PipelineRunner(executor, reporter, workdir).run(pipeline)
 
   const skipped = events.filter(e => e.event === 'STEP_SKIPPED')
   t.is(skipped.length, 2)
@@ -84,7 +87,6 @@ dockerTest('modifying step A cmd re-executes both steps', async t => {
   const tmpDir = await createTmpDir()
   const workdir = await createTmpDir()
 
-  const loader = new PipelineLoader()
   const executor = new DockerCliExecutor()
 
   // First run
@@ -95,7 +97,8 @@ dockerTest('modifying step A cmd re-executes both steps', async t => {
       {id: 'b', image: 'alpine:3.20', cmd: ['sh', '-c', 'cat /input/a/a.txt > /output/b.txt'], inputs: [{step: 'a'}]}
     ]
   })
-  await new PipelineRunner(loader, executor, noopReporter, workdir).run(path1)
+  const pipeline1 = await loader.load(path1)
+  await new PipelineRunner(executor, noopReporter, workdir).run(pipeline1)
 
   // Modify step A cmd
   const path2 = await writePipeline(tmpDir, {
@@ -107,7 +110,8 @@ dockerTest('modifying step A cmd re-executes both steps', async t => {
   })
 
   const {reporter, events} = recordingReporter()
-  await new PipelineRunner(loader, executor, reporter, workdir).run(path2)
+  const pipeline2 = await loader.load(path2)
+  await new PipelineRunner(executor, reporter, workdir).run(pipeline2)
 
   // Both steps should have executed (STEP_STARTING events, not STEP_SKIPPED)
   const starting = events.filter(e => e.event === 'STEP_STARTING')
@@ -131,7 +135,8 @@ dockerTest('step B executes even when step A fails with allowFailure', async t =
   })
 
   const {reporter, events} = recordingReporter()
-  await new PipelineRunner(new PipelineLoader(), new DockerCliExecutor(), reporter, workdir).run(pipelinePath)
+  const pipeline = await loader.load(pipelinePath)
+  await new PipelineRunner(new DockerCliExecutor(), reporter, workdir).run(pipeline)
 
   // Step B should have finished successfully
   const finished = events.filter(e => e.event === 'STEP_FINISHED')
@@ -152,15 +157,15 @@ dockerTest('force specific step re-executes only that step', async t => {
     ]
   })
 
-  const loader = new PipelineLoader()
   const executor = new DockerCliExecutor()
+  const pipeline = await loader.load(pipelinePath)
 
   // First run
-  await new PipelineRunner(loader, executor, noopReporter, workdir).run(pipelinePath)
+  await new PipelineRunner(executor, noopReporter, workdir).run(pipeline)
 
   // Second run with force on step b only
   const {reporter, events} = recordingReporter()
-  await new PipelineRunner(loader, executor, reporter, workdir).run(pipelinePath, {force: ['b']})
+  await new PipelineRunner(executor, reporter, workdir).run(pipeline, {force: ['b']})
 
   const skipped = events.filter((e): e is StepSkippedEvent => e.event === 'STEP_SKIPPED')
   const starting = events.filter((e): e is StepStartingEvent => e.event === 'STEP_STARTING')
@@ -184,7 +189,8 @@ dockerTest('dryRun emits STEP_WOULD_RUN without executing or committing', async 
   })
 
   const {reporter, events} = recordingReporter()
-  await new PipelineRunner(new PipelineLoader(), new DockerCliExecutor(), reporter, workdir).run(pipelinePath, {dryRun: true})
+  const pipeline = await loader.load(pipelinePath)
+  await new PipelineRunner(new DockerCliExecutor(), reporter, workdir).run(pipeline, {dryRun: true})
 
   t.truthy(events.find(e => e.event === 'STEP_WOULD_RUN'))
   t.falsy(events.find(e => e.event === 'STEP_STARTING'))
@@ -212,7 +218,8 @@ dockerTest('diamond DAG executes all steps in correct order', async t => {
   })
 
   const {reporter, events} = recordingReporter()
-  await new PipelineRunner(new PipelineLoader(), new DockerCliExecutor(), reporter, workdir).run(pipelinePath)
+  const pipeline = await loader.load(pipelinePath)
+  await new PipelineRunner(new DockerCliExecutor(), reporter, workdir).run(pipeline)
 
   const finished = events.filter((e): e is StepFinishedEvent => e.event === 'STEP_FINISHED')
   t.is(finished.length, 4)
@@ -233,8 +240,9 @@ dockerTest('failed step causes dependents to be skipped with reason dependency',
   })
 
   const {reporter, events} = recordingReporter()
+  const pipeline = await loader.load(pipelinePath)
   await t.throwsAsync(
-    async () => new PipelineRunner(new PipelineLoader(), new DockerCliExecutor(), reporter, workdir).run(pipelinePath),
+    async () => new PipelineRunner(new DockerCliExecutor(), reporter, workdir).run(pipeline),
     {instanceOf: ContainerCrashError}
   )
 
@@ -259,8 +267,9 @@ dockerTest('optional input allows step to run when input step is missing', async
   })
 
   const {reporter, events} = recordingReporter()
+  const pipeline = await loader.load(pipelinePath)
   await t.throwsAsync(
-    async () => new PipelineRunner(new PipelineLoader(), new DockerCliExecutor(), reporter, workdir).run(pipelinePath)
+    async () => new PipelineRunner(new DockerCliExecutor(), reporter, workdir).run(pipeline)
   )
 
   // Step b should have been attempted (STEP_STARTING)
@@ -282,7 +291,8 @@ dockerTest('if: "1 == 2" skips step with reason condition', async t => {
   })
 
   const {reporter, events} = recordingReporter()
-  await new PipelineRunner(new PipelineLoader(), new DockerCliExecutor(), reporter, workdir).run(pipelinePath)
+  const pipeline = await loader.load(pipelinePath)
+  await new PipelineRunner(new DockerCliExecutor(), reporter, workdir).run(pipeline)
 
   const skipped = events.filter((e): e is StepSkippedEvent => e.event === 'STEP_SKIPPED')
   t.is(skipped.length, 1)
@@ -305,7 +315,8 @@ dockerTest('--target executes only the targeted step and its dependencies', asyn
   })
 
   const {reporter, events} = recordingReporter()
-  await new PipelineRunner(new PipelineLoader(), new DockerCliExecutor(), reporter, workdir).run(pipelinePath, {target: ['b']})
+  const pipeline = await loader.load(pipelinePath)
+  await new PipelineRunner(new DockerCliExecutor(), reporter, workdir).run(pipeline, {target: ['b']})
 
   const finished = events.filter((e): e is StepFinishedEvent => e.event === 'STEP_FINISHED')
   const executedIds = finished.map(e => e.step.id).sort()
@@ -327,7 +338,8 @@ dockerTest('independent steps both finish (parallel execution)', async t => {
   })
 
   const {reporter, events} = recordingReporter()
-  await new PipelineRunner(new PipelineLoader(), new DockerCliExecutor(), reporter, workdir).run(pipelinePath)
+  const pipeline = await loader.load(pipelinePath)
+  await new PipelineRunner(new DockerCliExecutor(), reporter, workdir).run(pipeline)
 
   const finished = events.filter((e): e is StepFinishedEvent => e.event === 'STEP_FINISHED')
   t.is(finished.length, 2)

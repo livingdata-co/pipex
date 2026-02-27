@@ -9,9 +9,10 @@ import test from 'ava'
 import * as tar from 'tar'
 import {BundleError} from '../errors.js'
 import type {Kit, KitContext, Pipeline} from '../types.js'
+import {PipelineLoader} from '../pipeline-loader.js'
 import {collectDependencies, buildIgnoreFilter, buildBundle, extractBundle} from '../bundle.js'
 
-// Fake builtins for tests that use kit steps
+// Fake kits for tests that use kit steps
 const fakeShellKit: Kit = {
   name: 'shell',
   resolve(params) {
@@ -38,8 +39,9 @@ const fakeNodeKit: Kit = {
   }
 }
 
-const builtins = new Map<string, Kit>([['shell', fakeShellKit], ['node', fakeNodeKit]])
-const fakeKitContext: KitContext = {config: {}, cwd: '/tmp', builtins}
+const kits = new Map<string, Kit>([['shell', fakeShellKit], ['node', fakeNodeKit]])
+const fakeKitContext: KitContext = {config: {}, cwd: '/tmp', kits}
+const fakeKitLoader = new PipelineLoader(fakeKitContext)
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -78,7 +80,8 @@ async function listTarEntries(archive: Uint8Array): Promise<string[]> {
 test('collectDependencies returns empty array for pipeline without mounts or sources', t => {
   const pipeline: Pipeline = {
     id: 'test',
-    steps: [{id: 's', image: 'alpine', cmd: ['echo']}]
+    steps: [{id: 's', image: 'alpine', cmd: ['echo']}],
+    root: '/tmp'
   }
   t.deepEqual(collectDependencies(pipeline), [])
 })
@@ -91,7 +94,8 @@ test('collectDependencies collects from mounts', t => {
       image: 'alpine',
       cmd: ['echo'],
       mounts: [{host: 'config', container: '/config'}]
-    }]
+    }],
+    root: '/tmp'
   }
   t.deepEqual(collectDependencies(pipeline), ['config'])
 })
@@ -104,7 +108,8 @@ test('collectDependencies collects from sources', t => {
       image: 'alpine',
       cmd: ['echo'],
       sources: [{host: 'src', container: '/app'}]
-    }]
+    }],
+    root: '/tmp'
   }
   t.deepEqual(collectDependencies(pipeline), ['src'])
 })
@@ -118,7 +123,8 @@ test('collectDependencies collects from both mounts and sources', t => {
       cmd: ['echo'],
       mounts: [{host: 'config', container: '/config'}],
       sources: [{host: 'src', container: '/app'}]
-    }]
+    }],
+    root: '/tmp'
   }
   t.deepEqual(collectDependencies(pipeline), ['config', 'src'])
 })
@@ -139,7 +145,8 @@ test('collectDependencies deduplicates same path from different steps', t => {
         cmd: ['echo'],
         sources: [{host: 'data', container: '/app/data'}]
       }
-    ]
+    ],
+    root: '/tmp'
   }
   t.deepEqual(collectDependencies(pipeline), ['data'])
 })
@@ -153,7 +160,8 @@ test('collectDependencies returns sorted results', t => {
       cmd: ['echo'],
       mounts: [{host: 'zebra', container: '/z'}],
       sources: [{host: 'alpha', container: '/a'}]
-    }]
+    }],
+    root: '/tmp'
   }
   t.deepEqual(collectDependencies(pipeline), ['alpha', 'zebra'])
 })
@@ -174,7 +182,8 @@ test('collectDependencies normalizes paths', t => {
         cmd: ['echo'],
         sources: [{host: 'src', container: '/app'}]
       }
-    ]
+    ],
+    root: '/tmp'
   }
   t.deepEqual(collectDependencies(pipeline), ['src'])
 })
@@ -344,7 +353,7 @@ test('round-trip: manifest contains resolved pipeline (no uses field)', async t 
       }]
     })
 
-    const archive = await buildBundle(pipelinePath, fakeKitContext)
+    const archive = await buildBundle(pipelinePath, fakeKitLoader)
     const pipeline = await extractBundle(archive, extractDir)
 
     // Manifest should have resolved step (image and cmd, no uses)
@@ -587,7 +596,7 @@ test('round-trip: kit step with src resolves sources into bundle', async t => {
       }]
     })
 
-    const archive = await buildBundle(pipelinePath, fakeKitContext)
+    const archive = await buildBundle(pipelinePath, fakeKitLoader)
     const p = await extractBundle(archive, extractDir)
 
     // Kit resolved: image is node, sources contain myapp

@@ -19,8 +19,8 @@ const fakeShellKit: Kit = {
   }
 }
 
-const builtins = new Map<string, Kit>([['shell', fakeShellKit]])
-const fakeKitContext: KitContext = {config: {}, cwd: '/tmp', builtins}
+const kits = new Map<string, Kit>([['shell', fakeShellKit]])
+const fakeKitContext: KitContext = {config: {}, cwd: '/tmp', kits}
 
 // ---------------------------------------------------------------------------
 // slugify
@@ -287,14 +287,15 @@ test('parse: validates cache name is a valid identifier', async t => {
 })
 
 test('parse: resolves kit step (uses → image/cmd)', async t => {
-  const pipeline = await loader.parse(JSON.stringify({
+  const kitLoader = new PipelineLoader(fakeKitContext)
+  const pipeline = await kitLoader.parse(JSON.stringify({
     id: 'p',
     steps: [{
       id: 'b',
       uses: 'shell',
       with: {run: 'echo hello'}
     }]
-  }), 'p.json', fakeKitContext)
+  }), 'p.json')
 
   t.is(pipeline.steps[0].image, 'alpine:3.20')
   t.deepEqual(pipeline.steps[0].cmd, ['sh', '-c', 'echo hello'])

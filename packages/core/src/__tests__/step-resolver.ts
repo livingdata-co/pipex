@@ -14,7 +14,7 @@ const fakeShellKit: Kit = {
   }
 }
 
-const builtins = new Map<string, Kit>([['shell', fakeShellKit]])
+const kits = new Map<string, Kit>([['shell', fakeShellKit]])
 
 // ---------------------------------------------------------------------------
 // resolveKitStep — absolute path relativization
@@ -99,7 +99,7 @@ test('resolveKitStep passes resolveKit for chaining', async t => {
     }
   `, 'utf8')
 
-  const context: KitContext = {config: {}, cwd: dir, builtins}
+  const context: KitContext = {config: {}, cwd: dir, kits}
   const step = await resolveStep(
     {id: 'test', uses: 'chain-kit'},
     context
