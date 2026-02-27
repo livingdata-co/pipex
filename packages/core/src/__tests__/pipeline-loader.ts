@@ -1,5 +1,6 @@
 import test from 'ava'
 import {CyclicDependencyError, ValidationError} from '../errors.js'
+import type {Kit, KitContext} from '../types.js'
 import {
   PipelineLoader,
   slugify,
@@ -9,6 +10,17 @@ import {
   mergeMounts,
   mergeSetup
 } from '../pipeline-loader.js'
+
+const fakeShellKit: Kit = {
+  name: 'shell',
+  resolve(params) {
+    const run = params.run as string
+    return {image: 'alpine:3.20', cmd: ['sh', '-c', run]}
+  }
+}
+
+const builtins = new Map<string, Kit>([['shell', fakeShellKit]])
+const fakeKitContext: KitContext = {config: {}, cwd: '/tmp', builtins}
 
 // ---------------------------------------------------------------------------
 // slugify
@@ -282,7 +294,7 @@ test('parse: resolves kit step (uses → image/cmd)', async t => {
       uses: 'shell',
       with: {run: 'echo hello'}
     }]
-  }), 'p.json')
+  }), 'p.json', fakeKitContext)
 
   t.is(pipeline.steps[0].image, 'alpine:3.20')
   t.deepEqual(pipeline.steps[0].cmd, ['sh', '-c', 'echo hello'])

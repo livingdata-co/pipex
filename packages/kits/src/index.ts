@@ -7,7 +7,7 @@ export {nodeKit} from './node.js'
 export {pythonKit} from './python.js'
 export {shellKit} from './shell.js'
 
-export const builtinKits: Map<string, Kit> = new Map([
+export const builtinKits = new Map<string, Kit>([
   [nodeKit.name, nodeKit],
   [pythonKit.name, pythonKit],
   [shellKit.name, shellKit]

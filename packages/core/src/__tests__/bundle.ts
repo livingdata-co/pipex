@@ -8,8 +8,38 @@ import {pipeline} from 'node:stream/promises'
 import test from 'ava'
 import * as tar from 'tar'
 import {BundleError} from '../errors.js'
-import type {Pipeline} from '../types.js'
+import type {Kit, KitContext, Pipeline} from '../types.js'
 import {collectDependencies, buildIgnoreFilter, buildBundle, extractBundle} from '../bundle.js'
+
+// Fake builtins for tests that use kit steps
+const fakeShellKit: Kit = {
+  name: 'shell',
+  resolve(params) {
+    const run = params.run as string
+    return {image: 'alpine:3.20', cmd: ['sh', '-c', run]}
+  }
+}
+
+const fakeNodeKit: Kit = {
+  name: 'node',
+  resolve(params) {
+    const script = params.script as string | undefined
+    const run = params.run as string | undefined
+    const src = params.src as string | undefined
+    const output: {image: string; cmd: string[]; sources?: Array<{host: string; container: string}>} = {
+      image: 'node:24-alpine',
+      cmd: ['sh', '-c', run ?? `node /app/${script!}`]
+    }
+    if (src) {
+      output.sources = [{host: src, container: '/app'}]
+    }
+
+    return output
+  }
+}
+
+const builtins = new Map<string, Kit>([['shell', fakeShellKit], ['node', fakeNodeKit]])
+const fakeKitContext: KitContext = {config: {}, cwd: '/tmp', builtins}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -314,7 +344,7 @@ test('round-trip: manifest contains resolved pipeline (no uses field)', async t 
       }]
     })
 
-    const archive = await buildBundle(pipelinePath)
+    const archive = await buildBundle(pipelinePath, fakeKitContext)
     const pipeline = await extractBundle(archive, extractDir)
 
     // Manifest should have resolved step (image and cmd, no uses)
@@ -557,7 +587,7 @@ test('round-trip: kit step with src resolves sources into bundle', async t => {
       }]
     })
 
-    const archive = await buildBundle(pipelinePath)
+    const archive = await buildBundle(pipelinePath, fakeKitContext)
     const p = await extractBundle(archive, extractDir)
 
     // Kit resolved: image is node, sources contain myapp

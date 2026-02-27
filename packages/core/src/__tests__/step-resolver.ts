@@ -4,7 +4,17 @@ import {mkdir, writeFile} from 'node:fs/promises'
 import {randomUUID} from 'node:crypto'
 import test from 'ava'
 import {resolveStep} from '../step-resolver.js'
-import type {KitContext} from '../types.js'
+import type {Kit, KitContext} from '../types.js'
+
+const fakeShellKit: Kit = {
+  name: 'shell',
+  resolve(params) {
+    const run = params.run as string
+    return {image: 'alpine:3.20', cmd: ['sh', '-c', run]}
+  }
+}
+
+const builtins = new Map<string, Kit>([['shell', fakeShellKit]])
 
 // ---------------------------------------------------------------------------
 // resolveKitStep — absolute path relativization
@@ -89,7 +99,7 @@ test('resolveKitStep passes resolveKit for chaining', async t => {
     }
   `, 'utf8')
 
-  const context: KitContext = {config: {}, cwd: dir}
+  const context: KitContext = {config: {}, cwd: dir, builtins}
   const step = await resolveStep(
     {id: 'test', uses: 'chain-kit'},
     context

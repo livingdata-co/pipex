@@ -11,7 +11,7 @@ test.beforeEach(async () => {
 })
 
 test.afterEach(async () => {
-  await rm(tempDir, {recursive: true})
+  await rm(tempDir, {recursive: true, force: true})
 })
 
 test('parses KEY=VALUE lines', async t => {
