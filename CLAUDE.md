@@ -33,7 +33,7 @@ Monorepo with npm workspaces. Two packages: `packages/core`, `packages/cli`.
 Programmatic TypeScript API. No CLI dependency. Includes built-in kits (shell, node, python).
 
 #### Pipex Facade (`packages/core/src/pipex.ts`)
-- **Pipex** — Main entry point for programmatic usage. Wraps `PipelineLoader`, `PipelineRunner`, and `StepRunner`. Configure once with runtime, reporter, workdir, and custom kits. Built-in kits (shell, node, python) are always available. Provides `load()` (from file or JS object), `loadStep()`, and `run()` methods.
+- **Pipex** — Main entry point for programmatic usage. Wraps `PipelineLoader`, `PipelineRunner`, and `StepRunner`. Zero-config by default (Docker runtime, console reporter, built-in kits). All options optional. Provides `load()` (from file or JS object), `loadStep()`, and `run()` methods.
 
 #### Engine (`packages/core/src/engine/`)
 - **workspace.ts** — Manages isolated execution environments with three directory types: `staging/` (temporary write), `runs/` (committed immutable run outputs), `caches/` (persistent read-write shared across steps). Two-phase run lifecycle: prepareRun → commitRun/discardRun. Each run contains `artifacts/`, `stdout.log`, `stderr.log`, and `meta.json`.

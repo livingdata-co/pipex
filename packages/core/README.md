@@ -13,14 +13,10 @@ npm install @livingdata/pipex-core
 ## Usage
 
 ```typescript
-import {Pipex, DockerCliExecutor, ConsoleReporter} from '@livingdata/pipex-core'
+import {Pipex} from '@livingdata/pipex-core'
 
-// Built-in kits (shell, node, python) are always available
-const pipex = new Pipex({
-  runtime: new DockerCliExecutor(),
-  reporter: new ConsoleReporter(),
-  workdir: './workdir'
-})
+// Zero config — Docker runtime, console reporter, built-in kits (shell, node, python)
+const pipex = new Pipex()
 
 // Load from file or JS object
 const pipeline = await pipex.load('./pipeline.yaml')
@@ -32,11 +28,14 @@ const pipeline = await pipex.load({
 // Run the pipeline (all steps, or targeted)
 await pipex.run(pipeline)
 await pipex.run(pipeline, {target: ['greet']})
+```
 
-// Add custom kits
+All options are optional:
+
+```typescript
 const pipex = new Pipex({
-  workdir: './workdir',
-  kits: [{
+  workdir: './workdir',      // default: './workdir'
+  kits: [{                   // custom kits (added to built-ins)
     name: 'rust',
     resolve: (params) => ({image: `rust:${params.version ?? '1'}`, cmd: ['cargo', 'run']})
   }]
