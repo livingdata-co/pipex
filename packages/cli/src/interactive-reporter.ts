@@ -1,8 +1,7 @@
 import process from 'node:process'
 import {createLogUpdate} from 'log-update'
 import chalk from 'chalk'
-import type {Reporter, PipelineEvent, StepFinishedEvent, StepFailedEvent} from '../core/reporter.js'
-import {formatDuration, formatSize} from '../core/utils.js'
+import {type Reporter, type PipelineEvent, type StepFinishedEvent, type StepFailedEvent, formatDuration, formatSize} from '@livingdata/pipex-core'
 
 type StepStatus = 'pending' | 'running' | 'done' | 'skipped' | 'failed' | 'would-run'
 

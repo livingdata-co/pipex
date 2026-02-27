@@ -2,12 +2,8 @@ import process from 'node:process'
 import {randomUUID} from 'node:crypto'
 import {dirname, resolve} from 'node:path'
 import type {Command} from 'commander'
-import {DockerCliExecutor} from '../../engine/docker-executor.js'
-import {Workspace} from '../../engine/workspace.js'
-import {loadStepFile} from '../../core/step-loader.js'
-import {StepRunner} from '../../core/step-runner.js'
-import {StateManager} from '../../core/state.js'
-import {ConsoleReporter, type JobContext} from '../../core/reporter.js'
+import {DockerCliExecutor, Workspace, loadStepFile, StepRunner, StateManager, ConsoleReporter, type JobContext} from '@livingdata/pipex-core'
+import {builtinKits} from '@livingdata/pipex-kits'
 import {InteractiveReporter} from '../interactive-reporter.js'
 import {loadConfig} from '../config.js'
 import {getGlobalOptions} from '../utils.js'
@@ -37,7 +33,7 @@ export function registerExecCommand(program: Command): void {
       // Load step from file
       const cwd = process.cwd()
       const config = await loadConfig(cwd)
-      const kitContext = {config, cwd}
+      const kitContext = {config, cwd, builtins: builtinKits}
       const stepFilePath = resolve(options.file)
       const step = await loadStepFile(stepFilePath, options.step, kitContext)
       const pipelineRoot = dirname(stepFilePath)

@@ -1,10 +1,8 @@
 import process from 'node:process'
 import {resolve} from 'node:path'
 import type {Command} from 'commander'
-import {DockerCliExecutor} from '../../engine/docker-executor.js'
-import {PipelineLoader} from '../../core/pipeline-loader.js'
-import {PipelineRunner} from '../../core/pipeline-runner.js'
-import {ConsoleReporter} from '../../core/reporter.js'
+import {DockerCliExecutor, PipelineLoader, PipelineRunner, ConsoleReporter} from '@livingdata/pipex-core'
+import {builtinKits} from '@livingdata/pipex-kits'
 import {InteractiveReporter} from '../interactive-reporter.js'
 import {loadConfig} from '../config.js'
 import {getGlobalOptions, resolvePipelineFile} from '../utils.js'
@@ -26,7 +24,7 @@ export function registerRunCommand(program: Command): void {
       const {workdir, json} = getGlobalOptions(cmd)
       const cwd = process.cwd()
       const config = await loadConfig(cwd)
-      const kitContext = {config, cwd}
+      const kitContext = {config, cwd, builtins: builtinKits}
       const workdirRoot = resolve(workdir)
       const loader = new PipelineLoader()
       const runtime = new DockerCliExecutor()

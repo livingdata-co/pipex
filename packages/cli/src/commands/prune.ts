@@ -1,8 +1,7 @@
 import {resolve} from 'node:path'
 import chalk from 'chalk'
 import type {Command} from 'commander'
-import {Workspace} from '../../engine/workspace.js'
-import {StateManager} from '../../core/state.js'
+import {Workspace, StateManager} from '@livingdata/pipex-core'
 import {getGlobalOptions} from '../utils.js'
 
 export function registerPruneCommand(program: Command): void {

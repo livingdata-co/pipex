@@ -1,8 +1,7 @@
 import {resolve} from 'node:path'
 import chalk from 'chalk'
 import type {Command} from 'commander'
-import {Workspace} from '../../engine/workspace.js'
-import {dirSize, formatSize} from '../../core/utils.js'
+import {Workspace, dirSize, formatSize} from '@livingdata/pipex-core'
 import {getGlobalOptions} from '../utils.js'
 
 export function registerListCommand(program: Command): void {

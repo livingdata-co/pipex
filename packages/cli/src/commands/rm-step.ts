@@ -3,9 +3,7 @@ import {rm} from 'node:fs/promises'
 import {join, resolve} from 'node:path'
 import chalk from 'chalk'
 import type {Command} from 'commander'
-import {Workspace} from '../../engine/workspace.js'
-import {StateManager} from '../../core/state.js'
-import {dirSize, formatSize} from '../../core/utils.js'
+import {Workspace, StateManager, dirSize, formatSize} from '@livingdata/pipex-core'
 import {getGlobalOptions} from '../utils.js'
 
 export function registerRmStepCommand(program: Command): void {

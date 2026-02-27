@@ -1,7 +1,7 @@
 import {readFile} from 'node:fs/promises'
 import {join} from 'node:path'
 import {parse as parseYaml} from 'yaml'
-import type {PipexConfig} from '../types.js'
+import type {PipexConfig} from '@livingdata/pipex-core'
 
 /**
  * Loads the project-level `.pipex.yml` configuration from a directory.

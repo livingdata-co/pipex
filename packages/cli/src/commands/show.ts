@@ -3,9 +3,7 @@ import {readFile} from 'node:fs/promises'
 import {join, resolve} from 'node:path'
 import chalk from 'chalk'
 import type {Command} from 'commander'
-import {Workspace} from '../../engine/workspace.js'
-import {StateManager} from '../../core/state.js'
-import {dirSize, formatDuration, formatSize} from '../../core/utils.js'
+import {Workspace, StateManager, dirSize, formatDuration, formatSize} from '@livingdata/pipex-core'
 import {getGlobalOptions} from '../utils.js'
 
 function isProcessAlive(pid: number): boolean {

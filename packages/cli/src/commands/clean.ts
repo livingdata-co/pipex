@@ -1,7 +1,7 @@
 import {resolve} from 'node:path'
 import chalk from 'chalk'
 import type {Command} from 'commander'
-import {Workspace} from '../../engine/workspace.js'
+import {Workspace} from '@livingdata/pipex-core'
 import {getGlobalOptions} from '../utils.js'
 
 export function registerCleanCommand(program: Command): void {
