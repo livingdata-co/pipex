@@ -4,14 +4,12 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "lib": ["ES2024"],
-    "outDir": "./dist",
-    "rootDir": "./src",
     "strict": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "noEmit": false
-  },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"]
+    "declaration": true,
+    "declarationMap": true,
+    "composite": true
+  }
 }

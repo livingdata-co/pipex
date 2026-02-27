@@ -1,0 +1,35 @@
+{
+  "name": "@livingdata/pipex-core",
+  "version": "0.0.10",
+  "description": "Pipex core — programmatic API for containerized pipeline execution",
+  "author": "Jérôme Desboeufs <jerome@livingdata.co>",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "ava"
+  },
+  "dependencies": {
+    "dotenv": "^17.3.1",
+    "execa": "^9.6.1",
+    "ignore": "^7.0.5",
+    "jexl": "^2.3.0",
+    "lodash-es": "^4.17.23",
+    "pino": "^10.3.1",
+    "tar": "^7.5.9",
+    "yaml": "^2.8.2"
+  }
+}

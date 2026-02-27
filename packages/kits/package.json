@@ -1,0 +1,28 @@
+{
+  "name": "@livingdata/pipex-kits",
+  "version": "0.0.10",
+  "description": "Pipex builtin kits — shell, node, python step templates",
+  "author": "Jérôme Desboeufs <jerome@livingdata.co>",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "ava"
+  },
+  "dependencies": {
+    "@livingdata/pipex-core": "0.0.10"
+  }
+}

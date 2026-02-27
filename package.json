@@ -1,43 +1,23 @@
 {
-  "name": "@livingdata/pipex",
-  "version": "0.0.10",
+  "name": "pipex",
+  "private": true,
   "description": "Execution engine for containerized pipeline steps",
   "author": "Jérôme Desboeufs <jerome@livingdata.co>",
   "type": "module",
-  "bin": {
-    "pipex": "./dist/cli/index.js",
-    "@livingdata/pipex": "./dist/cli/index.js"
-  },
-  "files": [
-    "dist"
+  "workspaces": [
+    "packages/*"
   ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/livingdata-co/pipex.git"
   },
   "homepage": "https://github.com/livingdata-co/pipex#readme",
-  "publishConfig": {
-    "access": "public"
-  },
   "scripts": {
-    "cli": "tsx src/cli/index.ts",
-    "test": "ava",
+    "cli": "tsx packages/cli/src/index.ts",
+    "build": "tsc --build packages/core packages/kits packages/cli",
+    "test": "npm test --workspaces",
     "lint": "xo",
-    "lint:fix": "xo --fix",
-    "build": "tsc -p tsconfig.build.json"
-  },
-  "dependencies": {
-    "chalk": "^5.6.2",
-    "commander": "^14.0.3",
-    "dotenv": "^17.3.1",
-    "execa": "^9.6.1",
-    "ignore": "^7.0.5",
-    "jexl": "^2.3.0",
-    "lodash-es": "^4.17.23",
-    "log-update": "^7.1.0",
-    "pino": "^10.3.1",
-    "tar": "^7.5.9",
-    "yaml": "^2.8.2"
+    "lint:fix": "xo --fix"
   },
   "devDependencies": {
     "@ava/typescript": "^6.0.0",

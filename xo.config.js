@@ -52,8 +52,8 @@ const rules = {
   }
 }
 
-const ignoreExamples = {
-  ignores: ['examples/**']
+const ignorePatterns = {
+  ignores: ['examples/**', 'packages/*/dist/**']
 }
 
 const testOverrides = {
@@ -69,7 +69,7 @@ const testOverrides = {
 }
 
 const config = [
-  ignoreExamples,
+  ignorePatterns,
   jsFilesConfig,
   rules,
   testOverrides
