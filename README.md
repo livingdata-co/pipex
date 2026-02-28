@@ -59,6 +59,19 @@ This is a monorepo with two packages:
 | [`@livingdata/pipex`](packages/cli/) | CLI | Command-line interface, interactive reporter |
 | [`@livingdata/pipex-core`](packages/core/) | Library | Programmatic TypeScript API: engine, orchestration, built-in kits, types |
 
+## Custom Kits
+
+Write reusable step templates as JS modules, reference them via `uses`. Configure aliases in `.pipex.yml`:
+
+```yaml
+# .pipex.yml
+kits:
+  geo: ./kits/geo.js
+  ml: @myorg/pipex-kit-ml
+```
+
+See the [CLI README](packages/cli/README.md#custom-kits) for details on writing kits and resolution order.
+
 ## Examples
 
 ```bash

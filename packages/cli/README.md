@@ -144,7 +144,49 @@ steps:
     inputs: [{ step: transform }]
 ```
 
-See [`@livingdata/pipex-core`](../core/) for available kits and parameters.
+### Custom Kits
+
+Beyond the built-in kits (`shell`, `node`, `python`), you can write your own as JS modules.
+
+A kit exports a default function that receives `with` parameters and returns `{image, cmd}` (plus optional `setup`, `env`, `caches`, `mounts`, `sources`):
+
+```javascript
+// kits/rust.js
+export default function (params) {
+  return {
+    image: `rust:${params.version ?? '1'}`,
+    cmd: ['cargo', 'run'],
+    sources: [{host: params.src ?? '.', container: '/app'}]
+  }
+}
+```
+
+```yaml
+steps:
+  - id: build
+    uses: rust
+    with: { version: '1.77', src: ./project/ }
+```
+
+Kit resolution order:
+
+1. **`.pipex.yml` aliases** — mapped name → file path or npm specifier
+2. **`kits/<name>/index.js`** — local directory
+3. **`kits/<name>.js`** — local file
+4. **Built-in** — `shell`, `node`, `python`
+5. **npm module** — for scoped packages (`@org/kit-name`)
+
+### `.pipex.yml`
+
+Place a `.pipex.yml` file at the project root to declare kit aliases:
+
+```yaml
+kits:
+  geo: ./kits/geo.js
+  ml: @myorg/pipex-kit-ml
+```
+
+This lets you reference external kits (local files or npm packages) by short names in `uses`.
 
 ### Pipeline and Step Identity
 

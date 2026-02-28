@@ -62,6 +62,59 @@ const pipex = new Pipex({
 })
 ```
 
+## Custom Kits
+
+Beyond the built-in kits (`shell`, `node`, `python`), you can register custom kits.
+
+### Via `.pipex.yml` (CLI)
+
+```yaml
+kits:
+  geo: ./kits/geo.js           # local file
+  ml: @myorg/pipex-kit-ml      # npm package
+```
+
+### Via `Pipex` options (programmatic)
+
+```typescript
+const pipex = new Pipex({
+  kits: [{
+    name: 'rust',
+    resolve: (params) => ({
+      image: `rust:${params.version ?? '1'}`,
+      cmd: ['cargo', 'run'],
+      sources: [{host: params.src ?? '.', container: '/app'}]
+    })
+  }]
+})
+```
+
+### As a JS module
+
+A kit is a JS module exporting a default function that returns `{image, cmd}` (plus optional `setup`, `env`, `caches`, `mounts`, `sources`):
+
+```javascript
+// kits/rust.js
+export default function (params) {
+  return {
+    image: `rust:${params.version ?? '1'}`,
+    cmd: ['cargo', 'run'],
+    sources: [{host: params.src ?? '.', container: '/app'}]
+  }
+}
+```
+
+### Kit resolution order
+
+When a step uses `uses: <name>`, the kit is resolved in this order:
+
+1. **`.pipex.yml` aliases** — mapped name → file path or npm specifier
+2. **`kits/<name>/index.js`** — local directory
+3. **`kits/<name>.js`** — local file
+4. **Custom kits** — kits passed via `new Pipex({kits: [...]})`
+5. **Built-in** — `shell`, `node`, `python`
+6. **npm module** — for scoped packages (`@org/kit-name`)
+
 ## Main Exports
 
 ### Pipex Facade
