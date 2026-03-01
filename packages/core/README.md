@@ -38,6 +38,17 @@ const workspaces = await pipex.workspaces()             // list all
 await pipex.removeWorkspace('old-build')                // remove
 await pipex.clean()                                     // remove all
 
+// Detached execution (daemon mode) — pass a resolved Pipeline
+const pipeline = await pipex.load('./pipeline.yaml')
+const handle = await pipex.runDetached(pipeline, {workspace: 'my-ws'})
+// handle: { jobId, workspaceId, pid, socketPath }
+
+const client = await pipex.attach('my-ws')               // attach to running daemon
+client.on('event', event => { /* pipeline events */ })
+client.on('done', success => { /* finished */ })
+
+const lockInfo = await pipex.workspaceLock('my-ws')       // check if workspace is locked
+
 const ws = await pipex.workspace('my-workspace')        // open existing
 const info = await ws.show()                            // list steps
 const logs = await ws.logs('download')                  // read logs
@@ -150,6 +161,14 @@ When a step uses `uses: <name>`, the kit is resolved in this order:
 
 - **`buildGraph`**, **`validateGraph`**, **`topologicalLevels`**, **`subgraph`**, **`leafNodes`**
 
+### Daemon
+
+- **`DaemonClient`** — Connects to a running daemon via Unix socket. EventEmitter for pipeline events, status queries, and lifecycle management.
+- **`DaemonServer`** — Socket server that runs pipelines in background, broadcasts events to connected clients.
+- **`BroadcastReporter`** — Reporter that fans out pipeline events to multiple connected socket clients.
+- **`WorkspaceLock`** — Exclusive workspace lock with PID-alive checks and stale lock cleanup.
+- **`NdjsonEncoder`**, **`NdjsonDecoder`** — Newline-delimited JSON stream codec.
+
 ### Reporting
 
 - **`ConsoleReporter`** — Structured JSON output via Pino
@@ -162,4 +181,4 @@ All domain types are exported: `Pipeline`, `Step`, `Kit`, `KitContext`, `KitOutp
 
 ### Errors
 
-Structured error hierarchy: `PipexError` → `DockerError`, `WorkspaceError`, `PipelineError`, `KitError` with specific subclasses.
+Structured error hierarchy: `PipexError` → `DockerError`, `WorkspaceError`, `PipelineError`, `KitError`, `DaemonError` with specific subclasses (`WorkspaceLockedError`, etc.).

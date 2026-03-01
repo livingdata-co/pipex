@@ -68,6 +68,7 @@ pipex clean
 | Command | Description |
 |---------|-------------|
 | `run [pipeline]` | Execute a pipeline (file, directory, or cwd) |
+| `attach <workspace>` | Attach to a running pipeline in a workspace |
 | `exec <workspace> -f <step-file>` | Execute a single step in a workspace |
 | `cat <workspace> <step> [path]` | Read or list artifact content from a step's latest run |
 | `show <workspace>` | Show steps and runs in a workspace |
@@ -98,6 +99,8 @@ pipex clean
 | `--concurrency <n>` | `-c` | Max parallel step executions (default: CPU count) |
 | `--env-file <path>` | | Load environment variables from a dotenv file for all steps |
 | `--verbose` | | Stream container logs in real-time (interactive mode) |
+| `--detach` | `-d` | Run pipeline in background (daemon mode) |
+| `--attach` | | Force in-process execution (override detach config) |
 
 ### Exec Options
 
@@ -187,6 +190,14 @@ kits:
 ```
 
 This lets you reference external kits (local files or npm packages) by short names in `uses`.
+
+You can also set a default execution mode:
+
+```yaml
+detach: true   # pipex run launches a daemon and returns immediately
+```
+
+When `detach: true`, `pipex run` starts the pipeline in a background daemon. Use `--attach` to override and run in-process.
 
 ### Pipeline and Step Identity
 

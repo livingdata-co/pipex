@@ -123,3 +123,20 @@ Workspace ID is determined by (in priority order):
 2. Pipeline `id` (explicit or derived from `name`)
 
 Steps are skipped when their fingerprint (SHA256 of image + cmd + setup cmd + resolved env including `envFile` and `--env-file` + sorted inputs + mounts) hasn't changed since the last successful run. Use `--force` to bypass.
+
+## `.pipex.yml` Configuration
+
+Place a `.pipex.yml` file at the project root:
+
+```yaml
+kits:
+  geo: ./kits/geo.js        # kit alias → local file or npm specifier
+  ml: @myorg/pipex-kit-ml
+
+detach: true                 # default execution mode: daemon (background)
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `kits` | Record<string, string> | Kit aliases (name → file path or npm specifier) |
+| `detach` | boolean | When `true`, `pipex run` launches a daemon and returns immediately (default: `false`) |

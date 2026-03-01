@@ -35,6 +35,7 @@ npx @livingdata/pipex run
 - 🔒 **Two-phase execution** — Setup (install deps with network + cache locks) then run (isolated, parallel-safe)
 - 🔌 **Custom kits** — Write your own as JS modules, distribute via npm
 - 📦 **Artifact management** — Immutable runs with artifacts, logs, and structured metadata
+- 🔄 **Detached execution** — Run pipelines in background, re-attach to monitor progress
 - 🛠️ **Programmatic API** — Use `@livingdata/pipex-core` to embed pipeline execution in your own tools
 
 ## Quick Start

@@ -22,6 +22,10 @@ pipex run --env-file .env                     # Load env vars from file for all 
 pipex run --dry-run                          # Validate without executing
 pipex run --verbose                          # Stream container logs live
 pipex run --json                             # Structured JSON output (CI/CD)
+pipex run --detach                           # Run in background (daemon mode)
+pipex run --attach                           # Force in-process (override detach config)
+
+pipex attach <workspace>                     # Attach to a running pipeline
 
 pipex exec <ws> -f step.yaml --step <id>     # Execute a single step
 pipex exec <ws> -f step.yaml --step <id> --input prev-step  # Chain steps
