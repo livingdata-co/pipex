@@ -154,6 +154,8 @@ export function isKitStep(step: StepDefinition): step is KitStepDefinition {
 export type PipexConfig = {
   /** Kit aliases: maps a short name to a file path or npm module specifier. */
   kits?: Record<string, string>;
+  /** When true, `pipex run` launches a daemon and returns immediately. */
+  detach?: boolean;
 }
 
 // -- Kit types ---------------------------------------------------------------

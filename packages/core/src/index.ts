@@ -54,7 +54,7 @@ export {StreamReporter, CompositeReporter} from './stream-reporter.js'
 export {InMemoryTransport} from './transport.js'
 export type {TransportMessage, EventTransport} from './transport.js'
 export {EventAggregator} from './event-aggregator.js'
-export type {SessionState, StepState} from './event-aggregator.js'
+export type {SessionState, SerializedSessionState, StepState} from './event-aggregator.js'
 
 // Bundle
 export {collectDependencies, buildIgnoreFilter, buildBundle, extractBundle} from './bundle.js'
@@ -82,6 +82,24 @@ export type {
   KitContext
 } from './types.js'
 
+// Daemon
+export {WorkspaceLock, NdjsonEncoder, NdjsonDecoder, BroadcastReporter, DaemonServer, DaemonClient} from './daemon/index.js'
+export type {
+  DaemonClientEvents,
+  DaemonCommand,
+  DaemonMessage,
+  RunCommand,
+  StatusCommand,
+  SubscribeCommand,
+  CancelCommand,
+  EventMessage,
+  StateMessage,
+  AckMessage,
+  ErrorMessage as DaemonErrorMessage,
+  DoneMessage,
+  DaemonEntryMessage
+} from './daemon/index.js'
+
 // Errors
 export {
   PipexError,
@@ -94,6 +112,8 @@ export {
   WorkspaceError,
   ArtifactNotFoundError,
   StagingError,
+  WorkspaceLockedError,
+  DaemonError,
   PipelineError,
   ValidationError,
   CyclicDependencyError,
@@ -102,3 +122,4 @@ export {
   KitError,
   MissingParameterError
 } from './errors.js'
+export type {LockInfo} from './errors.js'

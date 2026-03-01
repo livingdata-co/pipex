@@ -131,6 +131,33 @@ export class BundleError extends PipexError {
   }
 }
 
+// -- Daemon errors -----------------------------------------------------------
+
+export type LockInfo = {
+  pid: number;
+  socketPath: string;
+  startedAt: string;
+  version: 1;
+}
+
+export class WorkspaceLockedError extends WorkspaceError {
+  constructor(
+    readonly workspaceId: string,
+    readonly lockInfo: LockInfo,
+    options?: {cause?: unknown}
+  ) {
+    super('WORKSPACE_LOCKED', `Workspace "${workspaceId}" is locked by process ${lockInfo.pid}`, options)
+    this.name = 'WorkspaceLockedError'
+  }
+}
+
+export class DaemonError extends PipexError {
+  constructor(message: string, options?: {cause?: unknown}) {
+    super('DAEMON_ERROR', message, options)
+    this.name = 'DaemonError'
+  }
+}
+
 // -- Kit errors --------------------------------------------------------------
 
 export class KitError extends PipexError {

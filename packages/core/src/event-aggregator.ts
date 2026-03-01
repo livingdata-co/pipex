@@ -20,6 +20,10 @@ export type SessionState = {
   steps: Map<string, StepState>;
 }
 
+export type SerializedSessionState = Omit<SessionState, 'steps'> & {
+  steps: Record<string, StepState>;
+}
+
 /**
  * Reconstructs pipeline session state from a stream of TransportMessages.
  */
