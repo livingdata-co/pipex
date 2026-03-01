@@ -6,6 +6,7 @@ steps:
     with:
       packages: [curl, ca-certificates]
       run: curl -fsSL https://www.geofabrik.de/data/shapefiles_dresden.zip -o /output/shapefiles_dresden.zip
+    allowNetwork: true
 
   - id: extract
     name: Extract Archive
