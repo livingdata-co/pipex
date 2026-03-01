@@ -18,7 +18,12 @@ export function registerRunCommand(program: Command): void {
     .option('-t, --target <steps>', 'Execute only these steps and their dependencies (comma-separated)')
     .option('-c, --concurrency <number>', 'Max parallel step executions (default: CPU count)', Number)
     .option('--env-file <path>', 'Load environment variables from a dotenv file for all steps')
-    .action(async (pipelineArg: string | undefined, options: {workspace?: string; force?: string | boolean; dryRun?: boolean; verbose?: boolean; target?: string; concurrency?: number; envFile?: string}, cmd: Command) => {
+    .option('-d, --detach', 'Run pipeline in background (daemon mode)')
+    .option('--attach', 'Force in-process execution (override detach config)')
+    .action(async (pipelineArg: string | undefined, options: {
+      workspace?: string; force?: string | boolean; dryRun?: boolean; verbose?: boolean;
+      target?: string; concurrency?: number; envFile?: string; detach?: boolean; attach?: boolean;
+    }, cmd: Command) => {
       const pipelineFile = await resolvePipelineFile(pipelineArg)
       const {workdir, json} = getGlobalOptions(cmd)
       const cwd = process.cwd()
@@ -28,6 +33,36 @@ export function registerRunCommand(program: Command): void {
       const workdirRoot = resolve(workdir)
 
       const pipex = new Pipex({runtime, reporter, workdir: workdirRoot, config, cwd})
+
+      // Load the pipeline once — needed for both detached and attached modes
+      const pipeline = await pipex.load(pipelineFile)
+
+      // Determine execution mode: --attach wins, then --detach, then config
+      const detach = options.attach ? false : (options.detach ?? config.detach ?? false)
+
+      const force = options.force === true
+        ? true
+        : (typeof options.force === 'string' ? options.force.split(',') : undefined)
+      const target = options.target ? options.target.split(',') : undefined
+      if (detach) {
+        const handle = await pipex.runDetached(pipeline, {
+          workspace: options.workspace,
+          force,
+          target,
+          concurrency: options.concurrency,
+          envFile: options.envFile
+        })
+
+        if (json) {
+          console.log(JSON.stringify(handle))
+        } else {
+          console.log(`Pipeline started in background (workspace: ${handle.workspaceId}, pid: ${handle.pid})`)
+        }
+
+        return
+      }
+
+      // Attached mode: in-process execution
 
       const onSignal = (signal: NodeJS.Signals) => {
         void (async () => {
@@ -40,11 +75,6 @@ export function registerRunCommand(program: Command): void {
       process.once('SIGTERM', onSignal)
 
       try {
-        const force = options.force === true
-          ? true
-          : (typeof options.force === 'string' ? options.force.split(',') : undefined)
-        const target = options.target ? options.target.split(',') : undefined
-        const pipeline = await pipex.load(pipelineFile)
         await pipex.run(pipeline, {workspace: options.workspace, force, dryRun: options.dryRun, target, concurrency: options.concurrency, envFile: options.envFile})
         if (json) {
           console.log('Pipeline completed')

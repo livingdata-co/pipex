@@ -14,6 +14,7 @@ import {registerCleanCommand} from './commands/clean.js'
 import {registerExecCommand} from './commands/exec.js'
 import {registerCatCommand} from './commands/cat.js'
 import {registerRmStepCommand} from './commands/rm-step.js'
+import {registerAttachCommand} from './commands/attach.js'
 
 async function main() {
   const program = new Command()
@@ -37,6 +38,7 @@ async function main() {
   registerExecCommand(program)
   registerCatCommand(program)
   registerRmStepCommand(program)
+  registerAttachCommand(program)
 
   await program.parseAsync()
 }

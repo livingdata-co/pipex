@@ -1,7 +1,7 @@
 import {resolve} from 'node:path'
 import chalk from 'chalk'
 import type {Command} from 'commander'
-import {Pipex, formatDuration, formatSize} from '@livingdata/pipex-core'
+import {Pipex, formatDuration, formatSize, type StepState} from '@livingdata/pipex-core'
 import {getGlobalOptions} from '../utils.js'
 
 export function registerShowCommand(program: Command): void {
@@ -14,6 +14,54 @@ export function registerShowCommand(program: Command): void {
       const workdirRoot = resolve(workdir)
 
       const pipex = new Pipex({workdir: workdirRoot})
+
+      // Check for active daemon — show live status if running
+      const lockInfo = await pipex.workspaceLock(workspaceName)
+      if (lockInfo) {
+        try {
+          const client = await pipex.attach(workspaceName)
+          const state = await client.status()
+          await client.disconnect()
+
+          // Steps arrive as a plain object after JSON serialization (not a Map)
+          const stepsArray: StepState[] = state.steps instanceof Map
+            ? [...state.steps.values()]
+            : Object.values(state.steps)
+
+          if (json) {
+            const steps = stepsArray.map(s => ({
+              stepId: s.id,
+              displayName: s.displayName,
+              status: s.status,
+              runId: s.runId,
+              durationMs: s.durationMs,
+              artifactSize: s.artifactSize
+            }))
+            console.log(JSON.stringify({live: true, session: {status: state.status, steps}}, null, 2))
+          } else {
+            console.log(chalk.yellow(`⟳ Live session (pid ${lockInfo.pid}, status: ${state.status})`))
+            for (const step of stepsArray) {
+              const statusColors: Record<string, typeof chalk.green> = {
+                finished: chalk.green, running: chalk.yellow, failed: chalk.red
+              }
+              const statusColor = statusColors[step.status] ?? chalk.gray
+
+              const duration = step.durationMs === undefined ? '-' : formatDuration(step.durationMs)
+              console.log(`  ${step.displayName.padEnd(30)} ${statusColor(step.status.padEnd(10))} ${duration}`)
+            }
+          }
+
+          return
+        } catch (error) {
+          if (!json) {
+            const message = error instanceof Error ? error.message : String(error)
+            console.error(chalk.yellow(`Could not connect to daemon (pid ${lockInfo.pid}): ${message}`))
+          }
+
+          // Fall through to disk-based display
+        }
+      }
+
       const ws = await pipex.workspace(workspaceName)
       const steps = await ws.show()
 
