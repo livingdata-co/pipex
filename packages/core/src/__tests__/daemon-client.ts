@@ -18,7 +18,7 @@ async function startDaemon(workdir: string, workspaceId: string) {
 
   const server = new DaemonServer({
     workspaceRoot: wsRoot,
-    pipexOptions: {workdir, runtime: new DockerCliExecutor()}
+    tyltOptions: {workdir, runtime: new DockerCliExecutor()}
   })
 
   await server.start()
@@ -192,21 +192,21 @@ dockerTest('subscriber receives events from pipeline run', async t => {
   t.true(subEventTypes.has('PIPELINE_FINISHED'))
 })
 
-dockerTest('Pipex.run() with lock guard creates workspace and commits artifacts', async t => {
+dockerTest('Tylt.run() with lock guard creates workspace and commits artifacts', async t => {
   const workdir = await createTmpDir()
-  // Import Pipex to test the full flow including lock guard
-  const {Pipex} = await import('../pipex.js')
+  // Import Tylt to test the full flow including lock guard
+  const {Tylt} = await import('../tylt.js')
 
-  const pipex = new Pipex({workdir, runtime: new DockerCliExecutor()})
-  const pipeline = await pipex.load({
+  const tylt = new Tylt({workdir, runtime: new DockerCliExecutor()})
+  const pipeline = await tylt.load({
     id: 'lock-test',
     steps: [{id: 'write', image: 'alpine:3.20', cmd: ['sh', '-c', 'echo locked > /output/out.txt']}]
   })
 
-  await pipex.run(pipeline)
+  await tylt.run(pipeline)
 
   // Verify artifacts are on disk (proves lock didn't break workspace creation)
-  const ws = await pipex.workspace('lock-test')
+  const ws = await tylt.workspace('lock-test')
   const info = await ws.show()
   t.is(info.length, 1)
   t.is(info[0].stepId, 'write')

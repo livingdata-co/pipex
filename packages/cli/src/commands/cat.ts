@@ -2,7 +2,7 @@ import process from 'node:process'
 import {resolve} from 'node:path'
 import chalk from 'chalk'
 import type {Command} from 'commander'
-import {Pipex} from '@livingdata/pipex-core'
+import {Tylt} from '@tylt/core'
 import {getGlobalOptions} from '../utils.js'
 
 export function registerCatCommand(program: Command): void {
@@ -16,8 +16,8 @@ export function registerCatCommand(program: Command): void {
       const {workdir} = getGlobalOptions(cmd)
       const workdirRoot = resolve(workdir)
 
-      const pipex = new Pipex({workdir: workdirRoot})
-      const ws = await pipex.workspace(workspaceName)
+      const tylt = new Tylt({workdir: workdirRoot})
+      const ws = await tylt.workspace(workspaceName)
 
       try {
         if (artifactPath) {

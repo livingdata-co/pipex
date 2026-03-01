@@ -98,7 +98,7 @@ export async function buildBundle(pipelineFilePath: string, loader?: PipelineLoa
   const manifestJson = JSON.stringify(manifest, null, 2) + '\n'
 
   // Use a staging directory with symlinks to combine manifest + deps in a single tar
-  const stagingDir = join(tmpdir(), `pipex-bundle-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+  const stagingDir = join(tmpdir(), `tylt-bundle-${Date.now()}-${Math.random().toString(36).slice(2)}`)
   await mkdir(stagingDir, {recursive: true})
 
   try {

@@ -150,11 +150,11 @@ export function isKitStep(step: StepDefinition): step is KitStepDefinition {
 
 // -- Configuration -----------------------------------------------------------
 
-/** Project-level configuration (`.pipex.yml`). */
-export type PipexConfig = {
+/** Project-level configuration (`.tylt.yml`). */
+export type TyltConfig = {
   /** Kit aliases: maps a short name to a file path or npm module specifier. */
   kits?: Record<string, string>;
-  /** When true, `pipex run` launches a daemon and returns immediately. */
+  /** When true, `tylt run` launches a daemon and returns immediately. */
   detach?: boolean;
 }
 
@@ -182,7 +182,7 @@ export type Kit = {
 /** Context for resolving kits (project config, working directory, custom kits). */
 export type KitContext = {
   /** Project-level config (kit aliases). */
-  config: PipexConfig;
+  config: TyltConfig;
   /** Working directory (used to locate `kits/` directory). */
   cwd: string;
   /** Custom kits added by the user (merged with built-in defaults). */

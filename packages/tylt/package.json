@@ -1,0 +1,19 @@
+{
+  "name": "tylt",
+  "version": "0.0.10",
+  "description": "Containerized pipeline execution engine — alias for @tylt/cli",
+  "author": "Jérôme Desboeufs <jerome@livingdata.co>",
+  "type": "module",
+  "bin": {
+    "tylt": "./bin.js"
+  },
+  "files": [
+    "bin.js"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@tylt/cli": "0.0.10"
+  }
+}

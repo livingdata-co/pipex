@@ -1,7 +1,7 @@
 import {resolve} from 'node:path'
 import chalk from 'chalk'
 import type {Command} from 'commander'
-import {Pipex, Workspace} from '@livingdata/pipex-core'
+import {Tylt, Workspace} from '@tylt/core'
 import {getGlobalOptions} from '../utils.js'
 
 export function registerCleanCommand(program: Command): void {
@@ -19,8 +19,8 @@ export function registerCleanCommand(program: Command): void {
         return
       }
 
-      const pipex = new Pipex({workdir: workdirRoot})
-      await pipex.clean()
+      const tylt = new Tylt({workdir: workdirRoot})
+      await tylt.clean()
 
       console.log(chalk.green(`Removed ${names.length} workspace${names.length > 1 ? 's' : ''}.`))
     })

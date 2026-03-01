@@ -1,55 +1,55 @@
-# @livingdata/pipex-core
+# @tylt/core
 
-Programmatic TypeScript API for the Pipex containerized pipeline engine.
+Programmatic TypeScript API for the Tylt containerized pipeline engine.
 
 Use this package to embed pipeline execution in your own tools, build custom orchestrators, or interact with workspaces and runs programmatically.
 
 ## Installation
 
 ```bash
-npm install @livingdata/pipex-core
+npm install @tylt/core
 ```
 
 ## Usage
 
 ```typescript
-import {Pipex} from '@livingdata/pipex-core'
+import {Tylt} from '@tylt/core'
 
 // Zero config — Docker runtime, console reporter, built-in kits (shell, node, python)
-const pipex = new Pipex()
+const tylt = new Tylt()
 
 // Load from file or JS object
-const pipeline = await pipex.load('./pipeline.yaml')
-const pipeline = await pipex.load({
+const pipeline = await tylt.load('./pipeline.yaml')
+const pipeline = await tylt.load({
   id: 'my-pipeline',
   steps: [{id: 'greet', uses: 'shell', with: {run: 'echo hello'}}]
 })
 
 // Run the pipeline (all steps, or targeted)
-await pipex.run(pipeline)
-await pipex.run(pipeline, {target: ['greet']})
+await tylt.run(pipeline)
+await tylt.run(pipeline, {target: ['greet']})
 
 // Execute a single step in a workspace
-const step = await pipex.loadStep('./step.yaml')
-await pipex.exec('my-workspace', step, {inputs: ['download']})
+const step = await tylt.loadStep('./step.yaml')
+await tylt.exec('my-workspace', step, {inputs: ['download']})
 
 // Workspace operations
-const workspaces = await pipex.workspaces()             // list all
-await pipex.removeWorkspace('old-build')                // remove
-await pipex.clean()                                     // remove all
+const workspaces = await tylt.workspaces()             // list all
+await tylt.removeWorkspace('old-build')                // remove
+await tylt.clean()                                     // remove all
 
 // Detached execution (daemon mode) — pass a resolved Pipeline
-const pipeline = await pipex.load('./pipeline.yaml')
-const handle = await pipex.runDetached(pipeline, {workspace: 'my-ws'})
+const pipeline = await tylt.load('./pipeline.yaml')
+const handle = await tylt.runDetached(pipeline, {workspace: 'my-ws'})
 // handle: { jobId, workspaceId, pid, socketPath }
 
-const client = await pipex.attach('my-ws')               // attach to running daemon
+const client = await tylt.attach('my-ws')               // attach to running daemon
 client.on('event', event => { /* pipeline events */ })
 client.on('done', success => { /* finished */ })
 
-const lockInfo = await pipex.workspaceLock('my-ws')       // check if workspace is locked
+const lockInfo = await tylt.workspaceLock('my-ws')       // check if workspace is locked
 
-const ws = await pipex.workspace('my-workspace')        // open existing
+const ws = await tylt.workspace('my-workspace')        // open existing
 const info = await ws.show()                            // list steps
 const logs = await ws.logs('download')                  // read logs
 const meta = await ws.inspect('download')               // read metadata
@@ -64,7 +64,7 @@ await ws.remove()                                       // remove workspace
 All options are optional:
 
 ```typescript
-const pipex = new Pipex({
+const tylt = new Tylt({
   workdir: './workdir',      // default: './workdir'
   kits: [{                   // custom kits (added to built-ins)
     name: 'rust',
@@ -77,18 +77,18 @@ const pipex = new Pipex({
 
 Beyond the built-in kits (`shell`, `node`, `python`), you can register custom kits.
 
-### Via `.pipex.yml` (CLI)
+### Via `.tylt.yml` (CLI)
 
 ```yaml
 kits:
   geo: ./kits/geo.js           # local file
-  ml: @myorg/pipex-kit-ml      # npm package
+  ml: @myorg/tylt-kit-ml      # npm package
 ```
 
-### Via `Pipex` options (programmatic)
+### Via `Tylt` options (programmatic)
 
 ```typescript
-const pipex = new Pipex({
+const tylt = new Tylt({
   kits: [{
     name: 'rust',
     resolve: (params) => ({
@@ -119,19 +119,19 @@ export default function (params) {
 
 When a step uses `uses: <name>`, the kit is resolved in this order:
 
-1. **`.pipex.yml` aliases** — mapped name → file path or npm specifier
+1. **`.tylt.yml` aliases** — mapped name → file path or npm specifier
 2. **`kits/<name>/index.js`** — local directory
 3. **`kits/<name>.js`** — local file
-4. **Custom kits** — kits passed via `new Pipex({kits: [...]})`
+4. **Custom kits** — kits passed via `new Tylt({kits: [...]})`
 5. **Built-in** — `shell`, `node`, `python`
 6. **npm module** — for scoped packages (`@org/kit-name`)
 
 ## Main Exports
 
-### Pipex Facade
+### Tylt Facade
 
-- **`Pipex`** — Main entry point. Configure once, load/run pipelines, exec single steps, manage workspaces. Built-in kits always available.
-- **`PipexWorkspace`** — Workspace handle returned by `pipex.workspace()`. Provides show, logs, inspect, artifact read/export, prune, remove operations.
+- **`Tylt`** — Main entry point. Configure once, load/run pipelines, exec single steps, manage workspaces. Built-in kits always available.
+- **`TyltWorkspace`** — Workspace handle returned by `tylt.workspace()`. Provides show, logs, inspect, artifact read/export, prune, remove operations.
 
 ### Engine
 
@@ -177,8 +177,8 @@ When a step uses `uses: <name>`, the kit is resolved in this order:
 
 ### Types
 
-All domain types are exported: `Pipeline`, `Step`, `Kit`, `KitContext`, `KitOutput`, `StepDefinition`, `PipelineDefinition`, `PipexConfig`, etc.
+All domain types are exported: `Pipeline`, `Step`, `Kit`, `KitContext`, `KitOutput`, `StepDefinition`, `PipelineDefinition`, `TyltConfig`, etc.
 
 ### Errors
 
-Structured error hierarchy: `PipexError` → `DockerError`, `WorkspaceError`, `PipelineError`, `KitError`, `DaemonError` with specific subclasses (`WorkspaceLockedError`, etc.).
+Structured error hierarchy: `TyltError` → `DockerError`, `WorkspaceError`, `PipelineError`, `KitError`, `DaemonError` with specific subclasses (`WorkspaceLockedError`, etc.).

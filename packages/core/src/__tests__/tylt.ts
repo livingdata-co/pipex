@@ -3,12 +3,12 @@ import {join} from 'node:path'
 import test from 'ava'
 import {Workspace} from '../engine/workspace.js'
 import {StateManager} from '../state.js'
-import {Pipex} from '../pipex.js'
+import {Tylt} from '../tylt.js'
 import {createTmpDir} from './helpers.js'
 
 // -- workspace -----------------------------------------------------------
 
-test('workspace() opens an existing workspace as PipexWorkspace', async t => {
+test('workspace() opens an existing workspace as TyltWorkspace', async t => {
   const tmpDir = await createTmpDir()
   const workspace = await Workspace.create(tmpDir, 'my-ws')
   const state = new StateManager(workspace.root)
@@ -16,8 +16,8 @@ test('workspace() opens an existing workspace as PipexWorkspace', async t => {
   state.setStep('step1', 'run-1', 'fp-1')
   await state.save()
 
-  const pipex = new Pipex({workdir: tmpDir})
-  const ws = await pipex.workspace('my-ws')
+  const tylt = new Tylt({workdir: tmpDir})
+  const ws = await tylt.workspace('my-ws')
 
   t.is(ws.name, 'my-ws')
   const steps = await ws.show()
@@ -27,8 +27,8 @@ test('workspace() opens an existing workspace as PipexWorkspace', async t => {
 
 test('workspace() throws for nonexistent workspace', async t => {
   const tmpDir = await createTmpDir()
-  const pipex = new Pipex({workdir: tmpDir})
-  await t.throwsAsync(async () => pipex.workspace('nope'))
+  const tylt = new Tylt({workdir: tmpDir})
+  await t.throwsAsync(async () => tylt.workspace('nope'))
 })
 
 // -- workspaces ----------------------------------------------------------
@@ -43,8 +43,8 @@ test('workspaces() lists all workspaces with info', async t => {
   await mkdir(join(runDir, 'artifacts'), {recursive: true})
   await writeFile(join(runDir, 'artifacts', 'out.txt'), 'data', 'utf8')
 
-  const pipex = new Pipex({workdir: tmpDir})
-  const workspaces = await pipex.workspaces()
+  const tylt = new Tylt({workdir: tmpDir})
+  const workspaces = await tylt.workspaces()
 
   t.is(workspaces.length, 2)
 
@@ -58,8 +58,8 @@ test('workspaces() lists all workspaces with info', async t => {
 
 test('workspaces() returns empty for missing workdir', async t => {
   const tmpDir = await createTmpDir()
-  const pipex = new Pipex({workdir: join(tmpDir, 'nonexistent')})
-  const workspaces = await pipex.workspaces()
+  const tylt = new Tylt({workdir: join(tmpDir, 'nonexistent')})
+  const workspaces = await tylt.workspaces()
   t.deepEqual(workspaces, [])
 })
 
@@ -69,8 +69,8 @@ test('removeWorkspace() removes a workspace', async t => {
   const tmpDir = await createTmpDir()
   await Workspace.create(tmpDir, 'to-remove')
 
-  const pipex = new Pipex({workdir: tmpDir})
-  await pipex.removeWorkspace('to-remove')
+  const tylt = new Tylt({workdir: tmpDir})
+  await tylt.removeWorkspace('to-remove')
 
   const remaining = await Workspace.list(tmpDir)
   t.false(remaining.includes('to-remove'))
@@ -78,8 +78,8 @@ test('removeWorkspace() removes a workspace', async t => {
 
 test('removeWorkspace() throws for nonexistent workspace', async t => {
   const tmpDir = await createTmpDir()
-  const pipex = new Pipex({workdir: tmpDir})
-  await t.throwsAsync(async () => pipex.removeWorkspace('nope'))
+  const tylt = new Tylt({workdir: tmpDir})
+  await t.throwsAsync(async () => tylt.removeWorkspace('nope'))
 })
 
 test('removeWorkspace() removes multiple workspaces', async t => {
@@ -88,8 +88,8 @@ test('removeWorkspace() removes multiple workspaces', async t => {
   await Workspace.create(tmpDir, 'b')
   await Workspace.create(tmpDir, 'c')
 
-  const pipex = new Pipex({workdir: tmpDir})
-  await pipex.removeWorkspace('a', 'b')
+  const tylt = new Tylt({workdir: tmpDir})
+  await tylt.removeWorkspace('a', 'b')
 
   const remaining = await Workspace.list(tmpDir)
   t.deepEqual(remaining, ['c'])
@@ -102,8 +102,8 @@ test('clean() removes all workspaces', async t => {
   await Workspace.create(tmpDir, 'x')
   await Workspace.create(tmpDir, 'y')
 
-  const pipex = new Pipex({workdir: tmpDir})
-  await pipex.clean()
+  const tylt = new Tylt({workdir: tmpDir})
+  await tylt.clean()
 
   const remaining = await Workspace.list(tmpDir)
   t.deepEqual(remaining, [])
@@ -111,8 +111,8 @@ test('clean() removes all workspaces', async t => {
 
 test('clean() succeeds with no workspaces', async t => {
   const tmpDir = await createTmpDir()
-  const pipex = new Pipex({workdir: tmpDir})
-  await pipex.clean()
+  const tylt = new Tylt({workdir: tmpDir})
+  await tylt.clean()
 
   const remaining = await Workspace.list(tmpDir)
   t.deepEqual(remaining, [])

@@ -11,34 +11,34 @@ import {PipelineRunner} from './pipeline-runner.js'
 import {StepRunner, type StepRunResult} from './step-runner.js'
 import {ConsoleReporter, type Reporter, type JobContext} from './reporter.js'
 import {StateManager} from './state.js'
-import {PipexWorkspace, type WorkspaceInfo} from './pipex-workspace.js'
+import {TyltWorkspace, type WorkspaceInfo} from './tylt-workspace.js'
 import {dirSize} from './utils.js'
 import {DaemonError, type LockInfo} from './errors.js'
-import type {Kit, KitContext, Pipeline, PipelineDefinition, PipexConfig, Step} from './types.js'
+import type {Kit, KitContext, Pipeline, PipelineDefinition, TyltConfig, Step} from './types.js'
 import {WorkspaceLock} from './daemon/workspace-lock.js'
 import {DaemonClient} from './daemon/daemon-client.js'
 import type {DaemonEntryMessage} from './daemon/daemon-entry.js'
 
-export type PipexOptions = {
+export type TyltOptions = {
   runtime?: ContainerExecutor;
   reporter?: Reporter;
   workdir?: string;
   kits?: Kit[];
-  config?: PipexConfig;
+  config?: TyltConfig;
   cwd?: string;
 }
 
-export class Pipex {
+export class Tylt {
   readonly loader: PipelineLoader
   readonly runner: PipelineRunner
   readonly stepRunner: StepRunner
   private readonly runtime: ContainerExecutor
   private readonly reporter: Reporter
   private readonly workdir: string
-  private readonly config: PipexConfig
+  private readonly config: TyltConfig
   private readonly cwd: string
 
-  constructor(options: PipexOptions = {}) {
+  constructor(options: TyltOptions = {}) {
     const customKits = options.kits
       ? new Map(options.kits.map(k => [k.name, k]))
       : undefined
@@ -199,7 +199,7 @@ export class Pipex {
 
       const message: DaemonEntryMessage = {
         workspaceRoot,
-        pipexOptions: {
+        tyltOptions: {
           workdir: this.workdir,
           config: this.config,
           cwd: this.cwd
@@ -271,11 +271,11 @@ export class Pipex {
     return WorkspaceLock.check(workspaceRoot)
   }
 
-  async workspace(name: string): Promise<PipexWorkspace> {
+  async workspace(name: string): Promise<TyltWorkspace> {
     const ws = await Workspace.open(this.workdir, name)
     const state = new StateManager(ws.root)
     await state.load()
-    return new PipexWorkspace(ws, state)
+    return new TyltWorkspace(ws, state)
   }
 
   async workspaces(): Promise<WorkspaceInfo[]> {

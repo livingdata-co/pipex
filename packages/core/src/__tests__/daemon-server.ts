@@ -14,7 +14,7 @@ test('server acquires workspace lock and creates socket', async t => {
 
   const server = new DaemonServer({
     workspaceRoot: wsRoot,
-    pipexOptions: {workdir: dir}
+    tyltOptions: {workdir: dir}
   })
 
   await server.start()
@@ -35,7 +35,7 @@ test('server cleans up socket and lock on stop', async t => {
 
   const server = new DaemonServer({
     workspaceRoot: wsRoot,
-    pipexOptions: {workdir: dir}
+    tyltOptions: {workdir: dir}
   })
 
   await server.start()
@@ -55,7 +55,7 @@ test('status command returns error when no session is running', async t => {
 
   const server = new DaemonServer({
     workspaceRoot: wsRoot,
-    pipexOptions: {workdir: dir}
+    tyltOptions: {workdir: dir}
   })
 
   await server.start()
@@ -71,7 +71,7 @@ test('status command returns error when no session is running', async t => {
 })
 
 test('client connect fails on non-existent socket', async t => {
-  const error = await t.throwsAsync(async () => DaemonClient.connect('/tmp/nonexistent-pipex.sock'))
+  const error = await t.throwsAsync(async () => DaemonClient.connect('/tmp/nonexistent-tylt.sock'))
   t.true(error instanceof DaemonError)
 })
 
@@ -81,7 +81,7 @@ test('client emits close when disconnected', async t => {
 
   const server = new DaemonServer({
     workspaceRoot: wsRoot,
-    pipexOptions: {workdir: dir}
+    tyltOptions: {workdir: dir}
   })
 
   await server.start()

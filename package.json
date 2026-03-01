@@ -1,22 +1,23 @@
 {
-  "name": "pipex",
+  "name": "tylt",
   "private": true,
   "description": "Execution engine for containerized pipeline steps",
   "author": "Jérôme Desboeufs <jerome@livingdata.co>",
   "type": "module",
   "workspaces": [
     "packages/core",
-    "packages/cli"
+    "packages/cli",
+    "packages/tylt"
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/livingdata-co/pipex.git"
+    "url": "git+https://github.com/tylt-org/tylt.git"
   },
-  "homepage": "https://github.com/livingdata-co/pipex#readme",
+  "homepage": "https://github.com/tylt-org/tylt#readme",
   "scripts": {
     "cli": "tsx packages/cli/src/index.ts",
     "build": "tsc --build packages/core packages/cli",
-    "test": "npm test --workspaces",
+    "test": "npm test --workspace=@tylt/core --workspace=@tylt/cli",
     "lint": "xo",
     "lint:fix": "xo --fix"
   },

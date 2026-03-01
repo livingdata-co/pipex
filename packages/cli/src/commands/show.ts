@@ -1,7 +1,7 @@
 import {resolve} from 'node:path'
 import chalk from 'chalk'
 import type {Command} from 'commander'
-import {Pipex, formatDuration, formatSize, type StepState} from '@livingdata/pipex-core'
+import {Tylt, formatDuration, formatSize, type StepState} from '@tylt/core'
 import {getGlobalOptions} from '../utils.js'
 
 export function registerShowCommand(program: Command): void {
@@ -13,13 +13,13 @@ export function registerShowCommand(program: Command): void {
       const {workdir, json} = getGlobalOptions(cmd)
       const workdirRoot = resolve(workdir)
 
-      const pipex = new Pipex({workdir: workdirRoot})
+      const tylt = new Tylt({workdir: workdirRoot})
 
       // Check for active daemon — show live status if running
-      const lockInfo = await pipex.workspaceLock(workspaceName)
+      const lockInfo = await tylt.workspaceLock(workspaceName)
       if (lockInfo) {
         try {
-          const client = await pipex.attach(workspaceName)
+          const client = await tylt.attach(workspaceName)
           const state = await client.status()
           await client.disconnect()
 
@@ -62,7 +62,7 @@ export function registerShowCommand(program: Command): void {
         }
       }
 
-      const ws = await pipex.workspace(workspaceName)
+      const ws = await tylt.workspace(workspaceName)
       const steps = await ws.show()
 
       const rows = steps.map(r => ({

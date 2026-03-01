@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Pipex is a containerized pipeline execution engine. Each step runs in an isolated Docker container with fingerprint-based caching.
+Tylt is a containerized pipeline execution engine. Each step runs in an isolated Docker container with fingerprint-based caching.
 
 ## Commands
 

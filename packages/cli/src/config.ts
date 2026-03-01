@@ -1,16 +1,16 @@
 import {readFile} from 'node:fs/promises'
 import {join} from 'node:path'
 import {parse as parseYaml} from 'yaml'
-import type {PipexConfig} from '@livingdata/pipex-core'
+import type {TyltConfig} from '@tylt/core'
 
 /**
- * Loads the project-level `.pipex.yml` configuration from a directory.
+ * Loads the project-level `.tylt.yml` configuration from a directory.
  * Returns an empty config when the file does not exist.
  */
-export async function loadConfig(dir: string): Promise<PipexConfig> {
+export async function loadConfig(dir: string): Promise<TyltConfig> {
   let content: string
   try {
-    content = await readFile(join(dir, '.pipex.yml'), 'utf8')
+    content = await readFile(join(dir, '.tylt.yml'), 'utf8')
   } catch (error: unknown) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
       return {}
@@ -24,5 +24,5 @@ export async function loadConfig(dir: string): Promise<PipexConfig> {
     return {}
   }
 
-  return parsed as PipexConfig
+  return parsed as TyltConfig
 }

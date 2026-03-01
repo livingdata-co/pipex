@@ -1,7 +1,7 @@
 {
-  "name": "@livingdata/pipex-core",
+  "name": "@tylt/core",
   "version": "0.0.10",
-  "description": "Pipex core — programmatic API for containerized pipeline execution",
+  "description": "Tylt core — programmatic API for containerized pipeline execution",
   "author": "Jérôme Desboeufs <jerome@livingdata.co>",
   "type": "module",
   "main": "dist/index.js",

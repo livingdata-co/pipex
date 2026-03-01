@@ -9,7 +9,7 @@ import {resolvePipelineFile} from '../utils.js'
 // ---------------------------------------------------------------------------
 
 test('resolvePipelineFile: resolves pipeline.yml in directory', async t => {
-  const dir = await mkdtemp(join(tmpdir(), 'pipex-test-'))
+  const dir = await mkdtemp(join(tmpdir(), 'tylt-test-'))
   try {
     await writeFile(join(dir, 'pipeline.yml'), 'id: test')
     const result = await resolvePipelineFile(dir)
@@ -20,7 +20,7 @@ test('resolvePipelineFile: resolves pipeline.yml in directory', async t => {
 })
 
 test('resolvePipelineFile: resolves pipeline.yaml in directory', async t => {
-  const dir = await mkdtemp(join(tmpdir(), 'pipex-test-'))
+  const dir = await mkdtemp(join(tmpdir(), 'tylt-test-'))
   try {
     await writeFile(join(dir, 'pipeline.yaml'), 'id: test')
     const result = await resolvePipelineFile(dir)
@@ -31,7 +31,7 @@ test('resolvePipelineFile: resolves pipeline.yaml in directory', async t => {
 })
 
 test('resolvePipelineFile: resolves pipeline.json in directory', async t => {
-  const dir = await mkdtemp(join(tmpdir(), 'pipex-test-'))
+  const dir = await mkdtemp(join(tmpdir(), 'tylt-test-'))
   try {
     await writeFile(join(dir, 'pipeline.json'), '{"id":"test"}')
     const result = await resolvePipelineFile(dir)
@@ -42,7 +42,7 @@ test('resolvePipelineFile: resolves pipeline.json in directory', async t => {
 })
 
 test('resolvePipelineFile: prefers yml over yaml and json', async t => {
-  const dir = await mkdtemp(join(tmpdir(), 'pipex-test-'))
+  const dir = await mkdtemp(join(tmpdir(), 'tylt-test-'))
   try {
     await writeFile(join(dir, 'pipeline.yml'), 'id: yml')
     await writeFile(join(dir, 'pipeline.yaml'), 'id: yaml')
@@ -55,7 +55,7 @@ test('resolvePipelineFile: prefers yml over yaml and json', async t => {
 })
 
 test('resolvePipelineFile: returns file path directly when given a file', async t => {
-  const dir = await mkdtemp(join(tmpdir(), 'pipex-test-'))
+  const dir = await mkdtemp(join(tmpdir(), 'tylt-test-'))
   try {
     const filePath = join(dir, 'custom.yaml')
     await writeFile(filePath, 'id: test')
@@ -74,7 +74,7 @@ test('resolvePipelineFile: throws when path does not exist', async t => {
 })
 
 test('resolvePipelineFile: throws when no pipeline file in directory', async t => {
-  const dir = await mkdtemp(join(tmpdir(), 'pipex-test-'))
+  const dir = await mkdtemp(join(tmpdir(), 'tylt-test-'))
   try {
     await t.throwsAsync(
       async () => resolvePipelineFile(dir),

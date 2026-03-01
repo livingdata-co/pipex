@@ -1,4 +1,4 @@
-# Pipex
+# Tylt
 
 Containerized pipeline execution engine. Each step runs in an isolated Docker container with explicit inputs, outputs, and caching.
 
@@ -23,7 +23,7 @@ steps:
 ```
 
 ```bash
-npx @livingdata/pipex run
+npx tylt run
 ```
 
 ## Features
@@ -36,19 +36,19 @@ npx @livingdata/pipex run
 - 🔌 **Custom kits** — Write your own as JS modules, distribute via npm
 - 📦 **Artifact management** — Immutable runs with artifacts, logs, and structured metadata
 - 🔄 **Detached execution** — Run pipelines in background, re-attach to monitor progress
-- 🛠️ **Programmatic API** — Use `@livingdata/pipex-core` to embed pipeline execution in your own tools
+- 🛠️ **Programmatic API** — Use `@tylt/core` to embed pipeline execution in your own tools
 
 ## Quick Start
 
 ```bash
-npx @livingdata/pipex run pipeline.yaml
+npx tylt run pipeline.yaml
 ```
 
 Or install globally:
 
 ```bash
-npm install -g @livingdata/pipex
-pipex run pipeline.yaml
+npm install -g @tylt/cli
+tylt run pipeline.yaml
 ```
 
 ## Packages
@@ -57,18 +57,18 @@ This is a monorepo with two packages:
 
 | Package | npm | Description |
 |---------|-----|-------------|
-| [`@livingdata/pipex`](packages/cli/) | CLI | Command-line interface, interactive reporter |
-| [`@livingdata/pipex-core`](packages/core/) | Library | Programmatic TypeScript API: engine, orchestration, built-in kits, types |
+| [`@tylt/cli`](packages/cli/) | CLI | Command-line interface, interactive reporter |
+| [`@tylt/core`](packages/core/) | Library | Programmatic TypeScript API: engine, orchestration, built-in kits, types |
 
 ## Custom Kits
 
-Write reusable step templates as JS modules, reference them via `uses`. Configure aliases in `.pipex.yml`:
+Write reusable step templates as JS modules, reference them via `uses`. Configure aliases in `.tylt.yml`:
 
 ```yaml
-# .pipex.yml
+# .tylt.yml
 kits:
   geo: ./kits/geo.js
-  ml: @myorg/pipex-kit-ml
+  ml: @myorg/tylt-kit-ml
 ```
 
 See the [CLI README](packages/cli/README.md#custom-kits) for details on writing kits and resolution order.
@@ -77,20 +77,20 @@ See the [CLI README](packages/cli/README.md#custom-kits) for details on writing 
 
 ```bash
 # Geodata: download → extract → list-files / build-csv (parallel)
-pipex run examples/geodata/
+tylt run examples/geodata/
 
 # Text processing: parallel branches, conditional steps, optional inputs
-pipex run examples/text-processing/
+tylt run examples/text-processing/
 
 # Multi-language: Node.js + Python steps with automatic dependency install
-pipex run examples/multi-language/
+tylt run examples/multi-language/
 ```
 
 ## Development
 
 ```bash
-git clone https://github.com/livingdata-co/pipex.git
-cd pipex
+git clone https://github.com/tylt-org/tylt.git
+cd tylt
 npm install
 ```
 

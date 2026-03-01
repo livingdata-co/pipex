@@ -1,30 +1,30 @@
-# @livingdata/pipex
+# @tylt/cli
 
-Command-line interface for the Pipex containerized pipeline engine.
+Command-line interface for the Tylt containerized pipeline engine.
 
 ## Installation
 
 ```bash
-npx @livingdata/pipex run pipeline.yaml
+npx @tylt/cli run pipeline.yaml
 ```
 
 Or install globally:
 
 ```bash
-npm install -g @livingdata/pipex
-pipex run pipeline.yaml
+npm install -g @tylt/cli
+tyltrun pipeline.yaml
 ```
 
 ## Usage
 
-The `run` command accepts a pipeline file path, a directory, or nothing (defaults to current directory). When given a directory, pipex looks for `pipeline.yml`, `pipeline.yaml`, or `pipeline.json` in order.
+The `run` command accepts a pipeline file path, a directory, or nothing (defaults to current directory). When given a directory, tyltlooks for `pipeline.yml`, `pipeline.yaml`, or `pipeline.json` in order.
 
 ```bash
-pipex run                           # auto-detect pipeline file in cwd
-pipex run examples/geodata/        # run from a directory
-pipex run pipeline.yaml            # run a specific file
-pipex run --json                   # JSON mode (for CI/CD)
-pipex run --workdir /tmp/builds    # custom workdir
+tyltrun                           # auto-detect pipeline file in cwd
+tyltrun examples/geodata/        # run from a directory
+tyltrun pipeline.yaml            # run a specific file
+tyltrun --json                   # JSON mode (for CI/CD)
+tyltrun --workdir /tmp/builds    # custom workdir
 ```
 
 ### Interactive step execution
@@ -32,12 +32,12 @@ pipex run --workdir /tmp/builds    # custom workdir
 Execute individual steps without a full pipeline file:
 
 ```bash
-pipex exec my-workspace -f step.yaml --step greet
-pipex cat my-workspace greet greeting.txt
-pipex exec my-workspace -f step.yaml --step greet --ephemeral
-pipex exec my-workspace -f process.yaml --step process --input greet
-pipex exec my-workspace -f process.yaml --step process --input data=greet
-pipex rm-step my-workspace greet
+tyltexec my-workspace -f step.yaml --step greet
+tyltcat my-workspace greet greeting.txt
+tyltexec my-workspace -f step.yaml --step greet --ephemeral
+tyltexec my-workspace -f process.yaml --step process --input greet
+tyltexec my-workspace -f process.yaml --step process --input data=greet
+tyltrm-step my-workspace greet
 ```
 
 ### Inspecting runs
@@ -45,22 +45,22 @@ pipex rm-step my-workspace greet
 Each step execution produces a **run** with artifacts, logs (stdout/stderr), and metadata:
 
 ```bash
-pipex show my-pipeline
-pipex logs my-pipeline download
-pipex logs my-pipeline download --stream stderr
-pipex inspect my-pipeline download
-pipex inspect my-pipeline download --json
-pipex export my-pipeline download ./output-dir
+tyltshow my-pipeline
+tyltlogs my-pipeline download
+tyltlogs my-pipeline download --stream stderr
+tyltinspect my-pipeline download
+tyltinspect my-pipeline download --json
+tyltexport my-pipeline download ./output-dir
 ```
 
 ### Managing workspaces
 
 ```bash
-pipex list
-pipex ls --json
-pipex prune my-pipeline
-pipex rm my-build other-build
-pipex clean
+tyltlist
+tyltls --json
+tyltprune my-pipeline
+tyltrm my-build other-build
+tyltclean
 ```
 
 ## Commands
@@ -173,20 +173,20 @@ steps:
 
 Kit resolution order:
 
-1. **`.pipex.yml` aliases** — mapped name → file path or npm specifier
+1. **`.tylt.yml` aliases** — mapped name → file path or npm specifier
 2. **`kits/<name>/index.js`** — local directory
 3. **`kits/<name>.js`** — local file
 4. **Built-in** — `shell`, `node`, `python`
 5. **npm module** — for scoped packages (`@org/kit-name`)
 
-### `.pipex.yml`
+### `.tylt.yml`
 
-Place a `.pipex.yml` file at the project root to declare kit aliases:
+Place a `.tylt.yml` file at the project root to declare kit aliases:
 
 ```yaml
 kits:
   geo: ./kits/geo.js
-  ml: @myorg/pipex-kit-ml
+  ml: @myorg/tylt-kit-ml
 ```
 
 This lets you reference external kits (local files or npm packages) by short names in `uses`.
@@ -194,10 +194,10 @@ This lets you reference external kits (local files or npm packages) by short nam
 You can also set a default execution mode:
 
 ```yaml
-detach: true   # pipex run launches a daemon and returns immediately
+detach: true   # tyltrun launches a daemon and returns immediately
 ```
 
-When `detach: true`, `pipex run` starts the pipeline in a background daemon. Use `--attach` to override and run in-process.
+When `detach: true`, `tyltrun` starts the pipeline in a background daemon. Use `--attach` to override and run in-process.
 
 ### Pipeline and Step Identity
 
@@ -256,8 +256,8 @@ steps:
 #### Targeted Execution
 
 ```bash
-pipex run pipeline.yaml --target merge
-pipex run pipeline.yaml --target process-a,process-b
+tyltrun pipeline.yaml --target merge
+tyltrun pipeline.yaml --target process-a,process-b
 ```
 
 ### Conditional Steps
@@ -345,14 +345,14 @@ newgrp docker
 ### Workspace disk full
 
 ```bash
-pipex list
-pipex rm old-workspace-id
-pipex clean
+tyltlist
+tyltrm old-workspace-id
+tyltclean
 ```
 
 ### Force re-execution
 
 ```bash
-pipex run --force
-pipex run --force download,process
+tyltrun --force
+tyltrun --force download,process
 ```

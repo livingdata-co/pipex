@@ -1,6 +1,6 @@
 import test from 'ava'
 import {
-  PipexError,
+  TyltError,
   DockerError,
   DockerNotAvailableError,
   ImagePullError,
@@ -20,82 +20,82 @@ import {
 
 // -- instanceof chains -------------------------------------------------------
 
-test('DockerNotAvailableError is instanceof DockerError and PipexError', t => {
+test('DockerNotAvailableError is instanceof DockerError and TyltError', t => {
   const error = new DockerNotAvailableError()
   t.true(error instanceof DockerNotAvailableError)
   t.true(error instanceof DockerError)
-  t.true(error instanceof PipexError)
+  t.true(error instanceof TyltError)
   t.true(error instanceof Error)
 })
 
-test('ImagePullError is instanceof DockerError and PipexError', t => {
+test('ImagePullError is instanceof DockerError and TyltError', t => {
   const error = new ImagePullError('alpine:latest')
   t.true(error instanceof ImagePullError)
   t.true(error instanceof DockerError)
-  t.true(error instanceof PipexError)
+  t.true(error instanceof TyltError)
 })
 
-test('ContainerTimeoutError is instanceof DockerError and PipexError', t => {
+test('ContainerTimeoutError is instanceof DockerError and TyltError', t => {
   const error = new ContainerTimeoutError(30)
   t.true(error instanceof ContainerTimeoutError)
   t.true(error instanceof DockerError)
-  t.true(error instanceof PipexError)
+  t.true(error instanceof TyltError)
 })
 
-test('ContainerCrashError is instanceof DockerError and PipexError', t => {
+test('ContainerCrashError is instanceof DockerError and TyltError', t => {
   const error = new ContainerCrashError('build', 1)
   t.true(error instanceof ContainerCrashError)
   t.true(error instanceof DockerError)
-  t.true(error instanceof PipexError)
+  t.true(error instanceof TyltError)
 })
 
-test('ContainerCleanupError is instanceof DockerError and PipexError', t => {
+test('ContainerCleanupError is instanceof DockerError and TyltError', t => {
   const error = new ContainerCleanupError()
   t.true(error instanceof ContainerCleanupError)
   t.true(error instanceof DockerError)
-  t.true(error instanceof PipexError)
+  t.true(error instanceof TyltError)
 })
 
-test('ArtifactNotFoundError is instanceof WorkspaceError and PipexError', t => {
+test('ArtifactNotFoundError is instanceof WorkspaceError and TyltError', t => {
   const error = new ArtifactNotFoundError('missing artifact')
   t.true(error instanceof ArtifactNotFoundError)
   t.true(error instanceof WorkspaceError)
-  t.true(error instanceof PipexError)
+  t.true(error instanceof TyltError)
 })
 
-test('StagingError is instanceof WorkspaceError and PipexError', t => {
+test('StagingError is instanceof WorkspaceError and TyltError', t => {
   const error = new StagingError('staging failed')
   t.true(error instanceof StagingError)
   t.true(error instanceof WorkspaceError)
-  t.true(error instanceof PipexError)
+  t.true(error instanceof TyltError)
 })
 
-test('ValidationError is instanceof PipelineError and PipexError', t => {
+test('ValidationError is instanceof PipelineError and TyltError', t => {
   const error = new ValidationError('invalid')
   t.true(error instanceof ValidationError)
   t.true(error instanceof PipelineError)
-  t.true(error instanceof PipexError)
+  t.true(error instanceof TyltError)
 })
 
-test('CyclicDependencyError is instanceof PipelineError and PipexError', t => {
+test('CyclicDependencyError is instanceof PipelineError and TyltError', t => {
   const error = new CyclicDependencyError('cycle detected')
   t.true(error instanceof CyclicDependencyError)
   t.true(error instanceof PipelineError)
-  t.true(error instanceof PipexError)
+  t.true(error instanceof TyltError)
 })
 
-test('StepNotFoundError is instanceof PipelineError and PipexError', t => {
+test('StepNotFoundError is instanceof PipelineError and TyltError', t => {
   const error = new StepNotFoundError('build', 'compile')
   t.true(error instanceof StepNotFoundError)
   t.true(error instanceof PipelineError)
-  t.true(error instanceof PipexError)
+  t.true(error instanceof TyltError)
 })
 
-test('MissingParameterError is instanceof KitError and PipexError', t => {
+test('MissingParameterError is instanceof KitError and TyltError', t => {
   const error = new MissingParameterError('node', 'script')
   t.true(error instanceof MissingParameterError)
   t.true(error instanceof KitError)
-  t.true(error instanceof PipexError)
+  t.true(error instanceof TyltError)
 })
 
 // -- code property -----------------------------------------------------------
@@ -168,7 +168,7 @@ test('StagingError is not transient', t => {
 
 // -- cause chaining ----------------------------------------------------------
 
-test('PipexError supports cause chaining', t => {
+test('TyltError supports cause chaining', t => {
   const cause = new Error('original')
   const error = new ValidationError('wrapped', {cause})
   t.is(error.cause, cause)

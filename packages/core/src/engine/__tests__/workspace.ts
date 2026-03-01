@@ -54,7 +54,7 @@ test('list returns sorted workspace IDs', async t => {
 })
 
 test('list returns empty array if root does not exist', async t => {
-  const ids = await Workspace.list('/tmp/nonexistent-pipex-root-' + Date.now())
+  const ids = await Workspace.list('/tmp/nonexistent-tylt-root-' + Date.now())
   t.deepEqual(ids, [])
 })
 

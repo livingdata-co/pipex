@@ -7,7 +7,7 @@ import {loadEnvFile} from '../env-file.js'
 let tempDir: string
 
 test.beforeEach(async () => {
-  tempDir = await mkdtemp(join(tmpdir(), 'pipex-env-'))
+  tempDir = await mkdtemp(join(tmpdir(), 'tylt-env-'))
 })
 
 test.afterEach(async () => {

@@ -4,9 +4,9 @@ export {ContainerExecutor, type LogLine, type OnLogLine} from './engine/executor
 export {DockerCliExecutor} from './engine/docker-executor.js'
 export type {BindMount, InputMount, OutputMount, CacheMount, SetupPhase, RunContainerRequest, RunContainerResult} from './engine/types.js'
 
-// Pipex facade
-export {Pipex, type PipexOptions} from './pipex.js'
-export {PipexWorkspace, type WorkspaceInfo, type StepInfo, type RunMeta, type ArtifactEntry} from './pipex-workspace.js'
+// Tylt facade
+export {Tylt, type TyltOptions} from './tylt.js'
+export {TyltWorkspace, type WorkspaceInfo, type StepInfo, type RunMeta, type ArtifactEntry} from './tylt-workspace.js'
 
 // Pipeline orchestration
 export {PipelineRunner} from './pipeline-runner.js'
@@ -75,7 +75,7 @@ export type {
   RawStepDefinition,
   StepDefinition,
   PipelineDefinition,
-  PipexConfig,
+  TyltConfig,
   Kit,
   KitOutput,
   KitResolveContext,
@@ -102,7 +102,7 @@ export type {
 
 // Errors
 export {
-  PipexError,
+  TyltError,
   DockerError,
   DockerNotAvailableError,
   ImagePullError,

@@ -3,11 +3,11 @@ import {join} from 'node:path'
 import test from 'ava'
 import {Workspace} from '../engine/workspace.js'
 import {StateManager} from '../state.js'
-import {PipexWorkspace} from '../pipex-workspace.js'
+import {TyltWorkspace} from '../tylt-workspace.js'
 import {createTmpDir} from './helpers.js'
 
 async function setupWorkspaceWithStep(): Promise<{
-  ws: PipexWorkspace;
+  ws: TyltWorkspace;
   workspace: Workspace;
   state: StateManager;
   tmpDir: string;
@@ -44,7 +44,7 @@ async function setupWorkspaceWithStep(): Promise<{
   state.setStep('build', runId, 'abc123')
   await state.save()
 
-  const ws = new PipexWorkspace(workspace, state)
+  const ws = new TyltWorkspace(workspace, state)
   return {ws, workspace, state, tmpDir, runId}
 }
 
@@ -68,7 +68,7 @@ test('show returns empty array for empty workspace', async t => {
   const workspace = await Workspace.create(tmpDir, 'empty-ws')
   const state = new StateManager(workspace.root)
   await state.load()
-  const ws = new PipexWorkspace(workspace, state)
+  const ws = new TyltWorkspace(workspace, state)
 
   const steps = await ws.show()
   t.deepEqual(steps, [])

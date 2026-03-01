@@ -46,7 +46,7 @@ export class WorkspaceLock {
     // Only create the lock directory — workspace structure (staging/, runs/, caches/)
     // is the responsibility of Workspace.create()
     await mkdir(workspaceRoot, {recursive: true})
-    const tmpPath = join(tmpdir(), `pipex-lock-${randomUUID()}.tmp`)
+    const tmpPath = join(tmpdir(), `tylt-lock-${randomUUID()}.tmp`)
     await writeFile(tmpPath, JSON.stringify(info, null, 2), 'utf8')
     await rename(tmpPath, lockPath)
 

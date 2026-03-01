@@ -1,11 +1,11 @@
-export class PipexError extends Error {
+export class TyltError extends Error {
   constructor(
     readonly code: string,
     message: string,
     options?: {cause?: unknown}
   ) {
     super(message, options)
-    this.name = 'PipexError'
+    this.name = 'TyltError'
   }
 
   get transient(): boolean {
@@ -15,7 +15,7 @@ export class PipexError extends Error {
 
 // -- Docker errors -----------------------------------------------------------
 
-export class DockerError extends PipexError {
+export class DockerError extends TyltError {
   constructor(code: string, message: string, options?: {cause?: unknown}) {
     super(code, message, options)
     this.name = 'DockerError'
@@ -71,7 +71,7 @@ export class ContainerCleanupError extends DockerError {
 
 // -- Workspace errors --------------------------------------------------------
 
-export class WorkspaceError extends PipexError {
+export class WorkspaceError extends TyltError {
   constructor(code: string, message: string, options?: {cause?: unknown}) {
     super(code, message, options)
     this.name = 'WorkspaceError'
@@ -94,7 +94,7 @@ export class StagingError extends WorkspaceError {
 
 // -- Pipeline errors ---------------------------------------------------------
 
-export class PipelineError extends PipexError {
+export class PipelineError extends TyltError {
   constructor(code: string, message: string, options?: {cause?: unknown}) {
     super(code, message, options)
     this.name = 'PipelineError'
@@ -124,7 +124,7 @@ export class StepNotFoundError extends PipelineError {
 
 // -- Bundle errors -----------------------------------------------------------
 
-export class BundleError extends PipexError {
+export class BundleError extends TyltError {
   constructor(message: string, options?: {cause?: unknown}) {
     super('BUNDLE_ERROR', message, options)
     this.name = 'BundleError'
@@ -151,7 +151,7 @@ export class WorkspaceLockedError extends WorkspaceError {
   }
 }
 
-export class DaemonError extends PipexError {
+export class DaemonError extends TyltError {
   constructor(message: string, options?: {cause?: unknown}) {
     super('DAEMON_ERROR', message, options)
     this.name = 'DaemonError'
@@ -160,7 +160,7 @@ export class DaemonError extends PipexError {
 
 // -- Kit errors --------------------------------------------------------------
 
-export class KitError extends PipexError {
+export class KitError extends TyltError {
   constructor(code: string, message: string, options?: {cause?: unknown}) {
     super(code, message, options)
     this.name = 'KitError'

@@ -2,12 +2,12 @@ import {createServer, type Server, type Socket} from 'node:net'
 import {join} from 'node:path'
 import {rm} from 'node:fs/promises'
 import {randomUUID} from 'node:crypto'
-import {Pipex, type PipexOptions} from '../pipex.js'
+import {Tylt, type TyltOptions} from '../tylt.js'
 import {ConsoleReporter} from '../reporter.js'
 import {CompositeReporter, StreamReporter} from '../stream-reporter.js'
 import {InMemoryTransport} from '../transport.js'
 import {EventAggregator, type SerializedSessionState, type SessionState} from '../event-aggregator.js'
-import type {PipexConfig, Pipeline} from '../types.js'
+import type {TyltConfig, Pipeline} from '../types.js'
 import type {DaemonCommand, DaemonMessage, RunCommand} from './protocol.js'
 import {WorkspaceLock} from './workspace-lock.js'
 import {BroadcastReporter} from './broadcast-reporter.js'
@@ -34,11 +34,11 @@ export class DaemonServer {
 
   constructor(private readonly options: {
     workspaceRoot: string;
-    pipexOptions: PipexOptions;
-    config?: PipexConfig;
+    tyltOptions: TyltOptions;
+    config?: TyltConfig;
     cwd?: string;
   }) {
-    this.socketPath = join(options.workspaceRoot, 'pipex.sock')
+    this.socketPath = join(options.workspaceRoot, 'tylt.sock')
     this.streamReporter = new StreamReporter(this.transport)
 
     // Wire aggregator to transport
@@ -187,15 +187,15 @@ export class DaemonServer {
       this.streamReporter
     )
 
-    const pipex = new Pipex({
-      ...this.options.pipexOptions,
+    const tylt = new Tylt({
+      ...this.options.tyltOptions,
       reporter,
       config: this.options.config,
       cwd: this.options.cwd
     })
 
     try {
-      await pipex.run(pipeline, {
+      await tylt.run(pipeline, {
         workspace: options?.workspace,
         force: options?.force,
         target: options?.target,

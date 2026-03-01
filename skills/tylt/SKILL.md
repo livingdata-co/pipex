@@ -1,50 +1,50 @@
 ---
-name: pipex
-description: Guide for using pipex, a containerized pipeline execution engine. Use when building, debugging, or running pipex pipelines (YAML/JSON), writing pipeline steps (kit or raw), using the pipex CLI (run, exec, show, logs, inspect, export, list, prune, rm, clean), or understanding pipex concepts (workspaces, caching, fingerprinting, inputs, mounts, sources, caches, kits).
+name: tylt
+description: Guide for using Tylt, a containerized pipeline execution engine. Use when building, debugging, or running Tylt pipelines (YAML/JSON), writing pipeline steps (kit or raw), using the Tylt CLI (run, exec, show, logs, inspect, export, list, prune, rm, clean), or understanding Tylt concepts (workspaces, caching, fingerprinting, inputs, mounts, sources, caches, kits).
 ---
 
-# Pipex
+# Tylt
 
-Containerized pipeline execution engine. Each step runs in an isolated Docker container. Pipex manages artifacts, logs, metadata, caches, and dependencies between steps with fingerprint-based caching.
+Containerized pipeline execution engine. Each step runs in an isolated Docker container. Tylt manages artifacts, logs, metadata, caches, and dependencies between steps with fingerprint-based caching.
 
 ## CLI Quick Reference
 
 ```bash
-pipex run                                    # Auto-detect pipeline.yml/yaml/json in cwd
-pipex run examples/geodata/                  # Auto-detect pipeline file in directory
-pipex run pipeline.yaml                      # Explicit pipeline file
-pipex run --workspace my-ws                  # Named workspace for caching
-pipex run --force                            # Skip cache for all steps
-pipex run --force step1,step2               # Skip cache for specific steps
-pipex run --target merge                     # Run only 'merge' + its dependencies
-pipex run --concurrency 4                    # Limit parallel steps
-pipex run --env-file .env                     # Load env vars from file for all steps
-pipex run --dry-run                          # Validate without executing
-pipex run --verbose                          # Stream container logs live
-pipex run --json                             # Structured JSON output (CI/CD)
-pipex run --detach                           # Run in background (daemon mode)
-pipex run --attach                           # Force in-process (override detach config)
+tylt run                                    # Auto-detect pipeline.yml/yaml/json in cwd
+tylt run examples/geodata/                  # Auto-detect pipeline file in directory
+tylt run pipeline.yaml                      # Explicit pipeline file
+tylt run --workspace my-ws                  # Named workspace for caching
+tylt run --force                            # Skip cache for all steps
+tylt run --force step1,step2               # Skip cache for specific steps
+tylt run --target merge                     # Run only 'merge' + its dependencies
+tylt run --concurrency 4                    # Limit parallel steps
+tylt run --env-file .env                     # Load env vars from file for all steps
+tylt run --dry-run                          # Validate without executing
+tylt run --verbose                          # Stream container logs live
+tylt run --json                             # Structured JSON output (CI/CD)
+tylt run --detach                           # Run in background (daemon mode)
+tylt run --attach                           # Force in-process (override detach config)
 
-pipex attach <workspace>                     # Attach to a running pipeline
+tylt attach <workspace>                     # Attach to a running pipeline
 
-pipex exec <ws> -f step.yaml --step <id>     # Execute a single step
-pipex exec <ws> -f step.yaml --step <id> --input prev-step  # Chain steps
-pipex exec <ws> -f step.yaml --step <id> --ephemeral        # Stream stdout, discard run
+tylt exec <ws> -f step.yaml --step <id>     # Execute a single step
+tylt exec <ws> -f step.yaml --step <id> --input prev-step  # Chain steps
+tylt exec <ws> -f step.yaml --step <id> --ephemeral        # Stream stdout, discard run
 
-pipex show <workspace>                       # Steps + runs overview
-pipex logs <workspace> <step>                # Stdout from last run
-pipex logs <workspace> <step> --stream stderr
-pipex inspect <workspace> <step>             # Run metadata (meta.json)
-pipex export <workspace> <step> ./out        # Extract artifacts to host
+tylt show <workspace>                       # Steps + runs overview
+tylt logs <workspace> <step>                # Stdout from last run
+tylt logs <workspace> <step> --stream stderr
+tylt inspect <workspace> <step>             # Run metadata (meta.json)
+tylt export <workspace> <step> ./out        # Extract artifacts to host
 
-pipex cat <workspace> <step>                 # List artifacts
-pipex cat <workspace> <step> file.txt        # Read artifact content
+tylt cat <workspace> <step>                 # List artifacts
+tylt cat <workspace> <step> file.txt        # Read artifact content
 
-pipex list                                   # List workspaces with sizes
-pipex prune <workspace>                      # Remove old runs, keep current
-pipex rm <workspace...>                      # Remove workspaces
-pipex rm-step <workspace> <step>             # Remove a step's run + state
-pipex clean                                  # Remove all workspaces
+tylt list                                   # List workspaces with sizes
+tylt prune <workspace>                      # Remove old runs, keep current
+tylt rm <workspace...>                      # Remove workspaces
+tylt rm-step <workspace> <step>             # Remove a step's run + state
+tylt clean                                  # Remove all workspaces
 ```
 
 ## Pipeline Structure
@@ -120,7 +120,7 @@ Use raw steps for full control over image and command:
 
 ## Inputs and Dependencies
 
-Steps declare dependencies via `inputs`. Pipex resolves the DAG and runs independent steps in parallel.
+Steps declare dependencies via `inputs`. Tylt resolves the DAG and runs independent steps in parallel.
 
 ```yaml
 - id: process-a

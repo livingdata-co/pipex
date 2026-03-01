@@ -1,7 +1,7 @@
 import {resolve} from 'node:path'
 import chalk from 'chalk'
 import type {Command} from 'commander'
-import {Pipex, formatSize} from '@livingdata/pipex-core'
+import {Tylt, formatSize} from '@tylt/core'
 import {getGlobalOptions} from '../utils.js'
 
 export function registerListCommand(program: Command): void {
@@ -13,8 +13,8 @@ export function registerListCommand(program: Command): void {
       const {workdir, json} = getGlobalOptions(cmd)
       const workdirRoot = resolve(workdir)
 
-      const pipex = new Pipex({workdir: workdirRoot})
-      const workspaces = await pipex.workspaces()
+      const tylt = new Tylt({workdir: workdirRoot})
+      const workspaces = await tylt.workspaces()
 
       if (json) {
         console.log(JSON.stringify(workspaces.map(w => w.name)))

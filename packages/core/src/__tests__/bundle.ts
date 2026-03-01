@@ -48,7 +48,7 @@ const fakeKitLoader = new PipelineLoader(fakeKitContext)
 // ---------------------------------------------------------------------------
 
 async function createTempDir(): Promise<string> {
-  const dir = join(tmpdir(), `pipex-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+  const dir = join(tmpdir(), `tylt-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
   await mkdir(dir, {recursive: true})
   return dir
 }

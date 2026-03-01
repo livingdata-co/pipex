@@ -6,14 +6,14 @@
  * After handshake, the daemon runs independently until auto-shutdown.
  */
 import process from 'node:process'
-import type {PipexOptions} from '../pipex.js'
-import type {PipexConfig} from '../types.js'
+import type {TyltOptions} from '../tylt.js'
+import type {TyltConfig} from '../types.js'
 import {DaemonServer} from './daemon-server.js'
 
 export type DaemonEntryMessage = {
   workspaceRoot: string;
-  pipexOptions: PipexOptions;
-  config?: PipexConfig;
+  tyltOptions: TyltOptions;
+  config?: TyltConfig;
   cwd?: string;
 }
 
@@ -32,7 +32,7 @@ await new Promise<void>((resolve, reject) => {
     try {
       const server = new DaemonServer({
         workspaceRoot: message.workspaceRoot,
-        pipexOptions: message.pipexOptions,
+        tyltOptions: message.tyltOptions,
         config: message.config,
         cwd: message.cwd
       })

@@ -61,7 +61,7 @@ test('resolveKit returns custom kit from context.kits', async t => {
 // ---------------------------------------------------------------------------
 
 test('resolveKit resolves from alias (config)', async t => {
-  const dir = join(tmpdir(), `pipex-test-${randomUUID()}`)
+  const dir = join(tmpdir(), `tylt-test-${randomUUID()}`)
   await mkdir(dir, {recursive: true})
 
   const kitFile = join(dir, 'my-kit.js')
@@ -85,7 +85,7 @@ test('resolveKit resolves from alias (config)', async t => {
 // ---------------------------------------------------------------------------
 
 test('resolveKit resolves from kits/ directory', async t => {
-  const dir = join(tmpdir(), `pipex-test-${randomUUID()}`)
+  const dir = join(tmpdir(), `tylt-test-${randomUUID()}`)
   const kitsDir = join(dir, 'kits')
   await mkdir(kitsDir, {recursive: true})
 
@@ -101,7 +101,7 @@ test('resolveKit resolves from kits/ directory', async t => {
 })
 
 test('resolveKit local file shadows builtin', async t => {
-  const dir = join(tmpdir(), `pipex-test-${randomUUID()}`)
+  const dir = join(tmpdir(), `tylt-test-${randomUUID()}`)
   const kitsDir = join(dir, 'kits')
   await mkdir(kitsDir, {recursive: true})
 
@@ -120,7 +120,7 @@ test('resolveKit local file shadows builtin', async t => {
 // ---------------------------------------------------------------------------
 
 test('resolveKit throws KIT_INVALID_EXPORT when default is not a function', async t => {
-  const dir = join(tmpdir(), `pipex-test-${randomUUID()}`)
+  const dir = join(tmpdir(), `tylt-test-${randomUUID()}`)
   await mkdir(dir, {recursive: true})
 
   const kitFile = join(dir, 'bad-kit.js')
@@ -150,7 +150,7 @@ test('resolveKit throws KIT_LOAD_FAILED on broken alias', async t => {
 // ---------------------------------------------------------------------------
 
 test('resolveKit resolves from kits/<name>/index.js directory', async t => {
-  const dir = join(tmpdir(), `pipex-test-${randomUUID()}`)
+  const dir = join(tmpdir(), `tylt-test-${randomUUID()}`)
   const kitDir = join(dir, 'kits', 'my-dir-kit')
   await mkdir(kitDir, {recursive: true})
 
@@ -166,7 +166,7 @@ test('resolveKit resolves from kits/<name>/index.js directory', async t => {
 })
 
 test('resolveKit directory takes precedence over flat file', async t => {
-  const dir = join(tmpdir(), `pipex-test-${randomUUID()}`)
+  const dir = join(tmpdir(), `tylt-test-${randomUUID()}`)
   const kitsDir = join(dir, 'kits')
   const kitSubDir = join(kitsDir, 'dual')
   await mkdir(kitSubDir, {recursive: true})
@@ -188,7 +188,7 @@ test('resolveKit directory takes precedence over flat file', async t => {
 })
 
 test('loaded kit has kitDir property', async t => {
-  const dir = join(tmpdir(), `pipex-test-${randomUUID()}`)
+  const dir = join(tmpdir(), `tylt-test-${randomUUID()}`)
   const kitsDir = join(dir, 'kits')
   const kitSubDir = join(kitsDir, 'with-dir')
   await mkdir(kitSubDir, {recursive: true})
@@ -203,7 +203,7 @@ test('loaded kit has kitDir property', async t => {
 })
 
 test('loaded flat kit has kitDir pointing to kits/ directory', async t => {
-  const dir = join(tmpdir(), `pipex-test-${randomUUID()}`)
+  const dir = join(tmpdir(), `tylt-test-${randomUUID()}`)
   const kitsDir = join(dir, 'kits')
   await mkdir(kitsDir, {recursive: true})
 

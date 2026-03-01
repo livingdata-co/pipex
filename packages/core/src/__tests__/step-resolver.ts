@@ -21,7 +21,7 @@ const kits = new Map<string, Kit>([['shell', fakeShellKit]])
 // ---------------------------------------------------------------------------
 
 test('resolveKitStep converts absolute kit sources to pipelineRoot-relative', async t => {
-  const dir = join(tmpdir(), `pipex-test-${randomUUID()}`)
+  const dir = join(tmpdir(), `tylt-test-${randomUUID()}`)
   const kitsDir = join(dir, 'kits')
   const kitSubDir = join(kitsDir, 'abs-kit')
   await mkdir(kitSubDir, {recursive: true})
@@ -53,7 +53,7 @@ test('resolveKitStep converts absolute kit sources to pipelineRoot-relative', as
 // ---------------------------------------------------------------------------
 
 test('resolveKitStep passes kitDir in KitResolveContext', async t => {
-  const dir = join(tmpdir(), `pipex-test-${randomUUID()}`)
+  const dir = join(tmpdir(), `tylt-test-${randomUUID()}`)
   const kitsDir = join(dir, 'kits')
   const kitSubDir = join(kitsDir, 'ctx-kit')
   await mkdir(kitSubDir, {recursive: true})
@@ -82,7 +82,7 @@ test('resolveKitStep passes kitDir in KitResolveContext', async t => {
 // ---------------------------------------------------------------------------
 
 test('resolveKitStep passes resolveKit for chaining', async t => {
-  const dir = join(tmpdir(), `pipex-test-${randomUUID()}`)
+  const dir = join(tmpdir(), `tylt-test-${randomUUID()}`)
   const kitsDir = join(dir, 'kits')
   const kitSubDir = join(kitsDir, 'chain-kit')
   await mkdir(kitSubDir, {recursive: true})
@@ -114,7 +114,7 @@ test('resolveKitStep passes resolveKit for chaining', async t => {
 // ---------------------------------------------------------------------------
 
 test('resolveKitStep leaves user-provided relative paths unchanged', async t => {
-  const dir = join(tmpdir(), `pipex-test-${randomUUID()}`)
+  const dir = join(tmpdir(), `tylt-test-${randomUUID()}`)
   const kitsDir = join(dir, 'kits')
   const kitSubDir = join(kitsDir, 'user-mount-kit')
   await mkdir(kitSubDir, {recursive: true})

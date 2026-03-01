@@ -2,7 +2,7 @@ import process from 'node:process'
 import {resolve} from 'node:path'
 import chalk from 'chalk'
 import type {Command} from 'commander'
-import {Pipex, formatSize} from '@livingdata/pipex-core'
+import {Tylt, formatSize} from '@tylt/core'
 import {getGlobalOptions} from '../utils.js'
 
 export function registerRmStepCommand(program: Command): void {
@@ -15,8 +15,8 @@ export function registerRmStepCommand(program: Command): void {
       const {workdir} = getGlobalOptions(cmd)
       const workdirRoot = resolve(workdir)
 
-      const pipex = new Pipex({workdir: workdirRoot})
-      const ws = await pipex.workspace(workspaceName)
+      const tylt = new Tylt({workdir: workdirRoot})
+      const ws = await tylt.workspace(workspaceName)
 
       // Get step info before removal for display
       const steps = await ws.show()

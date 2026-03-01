@@ -9,7 +9,7 @@ import type {Reporter, PipelineEvent} from '../reporter.js'
  * Each test should use its own tmpdir to avoid interference.
  */
 export async function createTmpDir(): Promise<string> {
-  return mkdtemp(join(tmpdir(), 'pipex-test-'))
+  return mkdtemp(join(tmpdir(), 'tylt-test-'))
 }
 
 /**

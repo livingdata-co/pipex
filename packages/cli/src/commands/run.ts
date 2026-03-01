@@ -1,7 +1,7 @@
 import process from 'node:process'
 import {resolve} from 'node:path'
 import type {Command} from 'commander'
-import {DockerCliExecutor, Pipex, ConsoleReporter} from '@livingdata/pipex-core'
+import {DockerCliExecutor, Tylt, ConsoleReporter} from '@tylt/core'
 import {InteractiveReporter} from '../interactive-reporter.js'
 import {loadConfig} from '../config.js'
 import {getGlobalOptions, resolvePipelineFile} from '../utils.js'
@@ -32,10 +32,10 @@ export function registerRunCommand(program: Command): void {
       const reporter = json ? new ConsoleReporter() : new InteractiveReporter({verbose: options.verbose})
       const workdirRoot = resolve(workdir)
 
-      const pipex = new Pipex({runtime, reporter, workdir: workdirRoot, config, cwd})
+      const tylt = new Tylt({runtime, reporter, workdir: workdirRoot, config, cwd})
 
       // Load the pipeline once — needed for both detached and attached modes
-      const pipeline = await pipex.load(pipelineFile)
+      const pipeline = await tylt.load(pipelineFile)
 
       // Determine execution mode: --attach wins, then --detach, then config
       const detach = options.attach ? false : (options.detach ?? config.detach ?? false)
@@ -45,7 +45,7 @@ export function registerRunCommand(program: Command): void {
         : (typeof options.force === 'string' ? options.force.split(',') : undefined)
       const target = options.target ? options.target.split(',') : undefined
       if (detach) {
-        const handle = await pipex.runDetached(pipeline, {
+        const handle = await tylt.runDetached(pipeline, {
           workspace: options.workspace,
           force,
           target,
@@ -75,7 +75,7 @@ export function registerRunCommand(program: Command): void {
       process.once('SIGTERM', onSignal)
 
       try {
-        await pipex.run(pipeline, {workspace: options.workspace, force, dryRun: options.dryRun, target, concurrency: options.concurrency, envFile: options.envFile})
+        await tylt.run(pipeline, {workspace: options.workspace, force, dryRun: options.dryRun, target, concurrency: options.concurrency, envFile: options.envFile})
         if (json) {
           console.log('Pipeline completed')
         }

@@ -1,7 +1,7 @@
 import process from 'node:process'
 import {resolve} from 'node:path'
 import type {Command} from 'commander'
-import {Pipex, ConsoleReporter} from '@livingdata/pipex-core'
+import {Tylt, ConsoleReporter} from '@tylt/core'
 import {InteractiveReporter} from '../interactive-reporter.js'
 import {getGlobalOptions} from '../utils.js'
 
@@ -15,8 +15,8 @@ export function registerAttachCommand(program: Command): void {
       const {workdir, json} = getGlobalOptions(cmd)
       const workdirRoot = resolve(workdir)
 
-      const pipex = new Pipex({workdir: workdirRoot})
-      const client = await pipex.attach(workspaceName)
+      const tylt = new Tylt({workdir: workdirRoot})
+      const client = await tylt.attach(workspaceName)
 
       const reporter = json
         ? new ConsoleReporter()

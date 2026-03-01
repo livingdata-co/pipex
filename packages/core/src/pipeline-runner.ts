@@ -6,7 +6,7 @@ import {setTimeout} from 'node:timers/promises'
 import {createWriteStream, type WriteStream} from 'node:fs'
 import {join, resolve} from 'node:path'
 import {Workspace, type ContainerExecutor, type InputMount, type OutputMount, type CacheMount, type BindMount, type SetupPhase} from './engine/index.js'
-import {ContainerCrashError, PipexError} from './errors.js'
+import {ContainerCrashError, TyltError} from './errors.js'
 import {loadEnvFile} from './env-file.js'
 import type {Pipeline, Step} from './types.js'
 import type {Reporter, StepRef, JobContext} from './reporter.js'
@@ -245,7 +245,7 @@ export class PipelineRunner {
           result = await this.runtime.run(
             workspace,
             {
-              name: `pipex-${workspace.id}-${step.id}-${Date.now()}`,
+              name: `tylt-${workspace.id}-${step.id}-${Date.now()}`,
               image: step.image,
               cmd: step.cmd,
               setup,
@@ -274,7 +274,7 @@ export class PipelineRunner {
           )
           break
         } catch (error) {
-          if (error instanceof PipexError && error.transient && attempt < maxRetries) {
+          if (error instanceof TyltError && error.transient && attempt < maxRetries) {
             this.reporter.emit({...job, event: 'STEP_RETRYING', step: stepRef, attempt: attempt + 1, maxRetries})
             await setTimeout(retryDelay)
             continue

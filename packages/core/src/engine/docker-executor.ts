@@ -51,13 +51,13 @@ export class DockerCliExecutor extends ContainerExecutor {
   }
 
   /**
-   * Remove any leftover pipex containers for the given workspace.
+   * Remove any leftover tylt containers for the given workspace.
    * Called before pipeline execution to clean up after crashes.
    */
   async cleanupContainers(workspaceId: string): Promise<void> {
     try {
       const {stdout} = await execa('docker', [
-        'ps', '-a', '--filter', `label=pipex.workspace=${workspaceId}`, '-q'
+        'ps', '-a', '--filter', `label=tylt.workspace=${workspaceId}`, '-q'
       ], {env: this.env})
 
       const ids = stdout.trim().split('\n').filter(Boolean)
@@ -199,9 +199,9 @@ export class DockerCliExecutor extends ContainerExecutor {
       '--network',
       network,
       '--label',
-      'pipex=true',
+      'tylt=true',
       '--label',
-      `pipex.workspace=${workspace.id}`
+      `tylt.workspace=${workspace.id}`
     ]
 
     if (request.env) {

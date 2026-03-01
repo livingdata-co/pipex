@@ -1,7 +1,7 @@
 import process from 'node:process'
 import {dirname, resolve} from 'node:path'
 import type {Command} from 'commander'
-import {DockerCliExecutor, Pipex, ConsoleReporter} from '@livingdata/pipex-core'
+import {DockerCliExecutor, Tylt, ConsoleReporter} from '@tylt/core'
 import {InteractiveReporter} from '../interactive-reporter.js'
 import {loadConfig} from '../config.js'
 import {getGlobalOptions} from '../utils.js'
@@ -30,9 +30,9 @@ export function registerExecCommand(program: Command): void {
 
       const cwd = process.cwd()
       const config = await loadConfig(cwd)
-      const pipex = new Pipex({runtime, reporter, workdir: workdirRoot, config, cwd})
+      const tylt = new Tylt({runtime, reporter, workdir: workdirRoot, config, cwd})
       const stepFilePath = resolve(options.file)
-      const step = await pipex.loadStep(stepFilePath, options.step)
+      const step = await tylt.loadStep(stepFilePath, options.step)
 
       const onSignal = (signal: NodeJS.Signals) => {
         void (async () => {
@@ -44,7 +44,7 @@ export function registerExecCommand(program: Command): void {
       process.once('SIGINT', onSignal)
       process.once('SIGTERM', onSignal)
 
-      await pipex.exec(workspaceName, step, {
+      await tylt.exec(workspaceName, step, {
         inputs: options.input,
         ephemeral: options.ephemeral,
         force: options.force,

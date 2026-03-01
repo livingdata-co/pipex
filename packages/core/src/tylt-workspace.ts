@@ -32,7 +32,7 @@ export type ArtifactEntry = {
   size: number;
 }
 
-export class PipexWorkspace {
+export class TyltWorkspace {
   constructor(
     private readonly ws: Workspace,
     private readonly state: StateManager

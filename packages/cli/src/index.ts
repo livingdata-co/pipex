@@ -20,10 +20,10 @@ async function main() {
   const program = new Command()
 
   program
-    .name('pipex')
+    .name('tylt')
     .description('Execution engine for containerized steps')
     .version('0.1.0')
-    .option('--workdir <path>', 'Workspaces root directory', process.env.PIPEX_WORKDIR ?? './workdir')
+    .option('--workdir <path>', 'Workspaces root directory', process.env.TYLT_WORKDIR ?? './workdir')
     .option('--json', 'Output structured JSON logs')
 
   registerRunCommand(program)
