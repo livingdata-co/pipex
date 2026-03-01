@@ -2,7 +2,14 @@
   "name": "@tylt/cli",
   "version": "0.0.1",
   "description": "Tylt CLI — command-line interface for containerized pipeline execution",
+  "license": "MIT",
   "author": "Jérôme Desboeufs <jerome@livingdata.co>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tylt-org/tylt.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/tylt-org/tylt/tree/main/packages/cli#readme",
   "type": "module",
   "bin": {
     "tylt": "dist/index.js"

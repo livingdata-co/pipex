@@ -2,7 +2,14 @@
   "name": "@tylt/core",
   "version": "0.0.1",
   "description": "Tylt core — programmatic API for containerized pipeline execution",
+  "license": "MIT",
   "author": "Jérôme Desboeufs <jerome@livingdata.co>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tylt-org/tylt.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/tylt-org/tylt/tree/main/packages/core#readme",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

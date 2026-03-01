@@ -2,6 +2,7 @@
   "name": "tylt",
   "private": true,
   "description": "Execution engine for containerized pipeline steps",
+  "license": "MIT",
   "author": "Jérôme Desboeufs <jerome@livingdata.co>",
   "type": "module",
   "workspaces": [
