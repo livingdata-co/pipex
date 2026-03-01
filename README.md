@@ -23,7 +23,7 @@ steps:
 ```
 
 ```bash
-npx tylt run
+npx @tylt/cli run
 ```
 
 ## Features
@@ -41,7 +41,7 @@ npx tylt run
 ## Quick Start
 
 ```bash
-npx tylt run pipeline.yaml
+npx @tylt/cli run pipeline.yaml
 ```
 
 Or install globally:

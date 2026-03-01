@@ -12,19 +12,19 @@ Or install globally:
 
 ```bash
 npm install -g @tylt/cli
-tyltrun pipeline.yaml
+tylt run pipeline.yaml
 ```
 
 ## Usage
 
-The `run` command accepts a pipeline file path, a directory, or nothing (defaults to current directory). When given a directory, tyltlooks for `pipeline.yml`, `pipeline.yaml`, or `pipeline.json` in order.
+The `run` command accepts a pipeline file path, a directory, or nothing (defaults to current directory). When given a directory, tylt looks for `pipeline.yml`, `pipeline.yaml`, or `pipeline.json` in order.
 
 ```bash
-tyltrun                           # auto-detect pipeline file in cwd
-tyltrun examples/geodata/        # run from a directory
-tyltrun pipeline.yaml            # run a specific file
-tyltrun --json                   # JSON mode (for CI/CD)
-tyltrun --workdir /tmp/builds    # custom workdir
+tylt run                           # auto-detect pipeline file in cwd
+tylt run examples/geodata/        # run from a directory
+tylt run pipeline.yaml            # run a specific file
+tylt run --json                   # JSON mode (for CI/CD)
+tylt run --workdir /tmp/builds    # custom workdir
 ```
 
 ### Interactive step execution
@@ -32,12 +32,12 @@ tyltrun --workdir /tmp/builds    # custom workdir
 Execute individual steps without a full pipeline file:
 
 ```bash
-tyltexec my-workspace -f step.yaml --step greet
-tyltcat my-workspace greet greeting.txt
-tyltexec my-workspace -f step.yaml --step greet --ephemeral
-tyltexec my-workspace -f process.yaml --step process --input greet
-tyltexec my-workspace -f process.yaml --step process --input data=greet
-tyltrm-step my-workspace greet
+tylt exec my-workspace -f step.yaml --step greet
+tylt cat my-workspace greet greeting.txt
+tylt exec my-workspace -f step.yaml --step greet --ephemeral
+tylt exec my-workspace -f process.yaml --step process --input greet
+tylt exec my-workspace -f process.yaml --step process --input data=greet
+tylt rm-step my-workspace greet
 ```
 
 ### Inspecting runs
@@ -45,22 +45,22 @@ tyltrm-step my-workspace greet
 Each step execution produces a **run** with artifacts, logs (stdout/stderr), and metadata:
 
 ```bash
-tyltshow my-pipeline
-tyltlogs my-pipeline download
-tyltlogs my-pipeline download --stream stderr
-tyltinspect my-pipeline download
-tyltinspect my-pipeline download --json
-tyltexport my-pipeline download ./output-dir
+tylt show my-pipeline
+tylt logs my-pipeline download
+tylt logs my-pipeline download --stream stderr
+tylt inspect my-pipeline download
+tylt inspect my-pipeline download --json
+tylt export my-pipeline download ./output-dir
 ```
 
 ### Managing workspaces
 
 ```bash
-tyltlist
-tyltls --json
-tyltprune my-pipeline
-tyltrm my-build other-build
-tyltclean
+tylt list
+tylt ls --json
+tylt prune my-pipeline
+tylt rm my-build other-build
+tylt clean
 ```
 
 ## Commands
@@ -194,10 +194,10 @@ This lets you reference external kits (local files or npm packages) by short nam
 You can also set a default execution mode:
 
 ```yaml
-detach: true   # tyltrun launches a daemon and returns immediately
+detach: true   # tylt run launches a daemon and returns immediately
 ```
 
-When `detach: true`, `tyltrun` starts the pipeline in a background daemon. Use `--attach` to override and run in-process.
+When `detach: true`, `tylt run` starts the pipeline in a background daemon. Use `--attach` to override and run in-process.
 
 ### Pipeline and Step Identity
 
@@ -256,8 +256,8 @@ steps:
 #### Targeted Execution
 
 ```bash
-tyltrun pipeline.yaml --target merge
-tyltrun pipeline.yaml --target process-a,process-b
+tylt run pipeline.yaml --target merge
+tylt run pipeline.yaml --target process-a,process-b
 ```
 
 ### Conditional Steps
@@ -345,14 +345,14 @@ newgrp docker
 ### Workspace disk full
 
 ```bash
-tyltlist
-tyltrm old-workspace-id
-tyltclean
+tylt list
+tylt rm old-workspace-id
+tylt clean
 ```
 
 ### Force re-execution
 
 ```bash
-tyltrun --force
-tyltrun --force download,process
+tylt run --force
+tylt run --force download,process
 ```
